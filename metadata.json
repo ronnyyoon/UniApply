@@ -1,0 +1,6 @@
+{
+  "name": "2027학년도 대학 수시 모의산출",
+  "description": "2027학년도 인문/자연계 고등학교 대학입시 상담 및 수시 점수 모의 산출 프로그램입니다. 학생 및 교사 맞춤형 포털과 CMS, 관리자 대시보드 커스터마이징 기능을 제공합니다.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

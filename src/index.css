@@ -1,0 +1,102 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-zinc-950: #0A0A0A;
+  --color-zinc-900: #111111;
+  --color-zinc-800: #222222;
+  --color-zinc-700: #333333;
+  --color-zinc-100: #FFFFFF;
+  --color-zinc-400: #A1A1AA;
+  --color-zinc-500: #71717A;
+}
+
+/* Base resets & fonts */
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: #0A0A0A;
+  color: #FFFFFF;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0A0A0A;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #222222;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #333333;
+}
+
+/* Theme Utilities for Professional Polish */
+.accent-gold {
+  color: #FFC107;
+}
+
+.bg-gold {
+  background-color: #FFC107;
+  color: #111111;
+}
+
+.border-gold {
+  border-color: #FFC107;
+}
+
+.professional-bg-main {
+  background-color: #0A0A0A;
+}
+
+.professional-bg-sidebar {
+  background-color: #111111;
+}
+
+.professional-bg-header {
+  background-color: #111111;
+}
+
+.professional-bg-card {
+  background-color: #161616;
+}
+
+.professional-border {
+  border-color: #222222;
+}
+
+.professional-border-dark {
+  border-color: #1A1A1A;
+}
+
+.professional-border-light {
+  border-color: #333333;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideRight {
+  from { transform: translateX(-20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+.animate-slide-right {
+  animation: slideRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
