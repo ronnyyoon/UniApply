@@ -19,7 +19,7 @@ const firebaseConfig = {
 // 3. 파이어베이스 앱 인스턴스 초기화
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// 4. 실서버용 진짜 데이터베이스 연결 (Long Polling 설정 유지)
+// 4. 실서버용 진짜 데이터베이스 연결
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true
 }, "ai-studio-7f96f620-b672-4d89-9be5-5aaf4ec4c62c");
@@ -41,14 +41,29 @@ export interface CollegeStat {
   avgGpa2026?: string;
 }
 
-// 7. [핵심] 다른 파일(CollegeCalculator.tsx)에서 애타게 찾고 있는 데이터 불러오기 함수
+// 7. [수정] 실제 파이어베이스 DB 필드명(universityName 등)을 화면 규격(college 등)에 맞게 번역 매핑
 export async function fetchCollegeStats(): Promise<CollegeStat[]> {
   try {
     const querySnapshot = await getDocs(collection(db, "officialStats"));
     const stats: CollegeStat[] = [];
+    
     querySnapshot.forEach((doc) => {
-      stats.push({ id: doc.id, ...doc.data() } as CollegeStat);
+      const data = doc.data();
+      stats.push({
+        id: doc.id,
+        // DB의 실제 필드명이 universityName/departmentName 형태일 때 안전하게 매핑 (없으면 대피값 적용)
+        college: data.universityName || data.college || "",
+        major: data.departmentName || data.major || "",
+        type: data.admissionType || data.type || "",
+        detailType: data.detailedType || data.detailType || "",
+        recruitCount2026: String(data.recruitCount2026 || data.recruitCount || "0"),
+        cut70_2026: String(data.cut70_2026 || data.cut70 || "-"),
+        chuhapNo2026: String(data.chuhapNo2026 || data.chuhapNo || "-"),
+        ratio2026: String(data.ratio2026 || data.ratio || "-"),
+        avgGpa2026: data.avgGpa2026 ? String(data.avgGpa2026) : undefined
+      });
     });
+    
     return stats;
   } catch (error) {
     console.error("Error fetching college stats:", error);
@@ -56,7 +71,7 @@ export async function fetchCollegeStats(): Promise<CollegeStat[]> {
   }
 }
 
-// 8. [핵심] 초기 데이터를 파이어베이스에 심어주는 시드 함수
+// 8. 초기 데이터를 파이어베이스에 심어주는 시드 함수
 export async function seedCollegeStats(stats: Omit<CollegeStat, 'id'>[]): Promise<void> {
   try {
     for (const stat of stats) {
