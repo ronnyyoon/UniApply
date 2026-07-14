@@ -5,22 +5,20 @@ import importedConfig from '../../firebase-applet-config.json';
 // Support external deployment (Netlify) where firebase-applet-config.json might be missing
 // by using fallback default configurations
 const firebaseConfig = {
-  apiKey: importedConfig?.apiKey || "AIzaSyAmWv8nUlpusf7mIKUFonmbx-eITFR_ETw",
-  authDomain: importedConfig?.authDomain || "modified-mote-207pf.firebaseapp.com",
-  projectId: importedConfig?.projectId || "modified-mote-207pf",
-  storageBucket: importedConfig?.storageBucket || "modified-mote-207pf.firebasestorage.app",
-  messagingSenderId: importedConfig?.messagingSenderId || "921522866159",
-  appId: importedConfig?.appId || "1:921522866159:web:754d71b905c75ab8de181a",
-  firestoreDatabaseId: importedConfig?.firestoreDatabaseId || "ai-studio-2027-727c2075-fa13-4ce0-a687-7178a12d7998"
+  apiKey: "AIzaSyAEsGZwIBBdJ6rlgljHgeqqAIePQGnjR_s",
+  authDomain: "gen-lang-client-0276044322.firebaseapp.com",
+  projectId: "gen-lang-client-0276044322",
+  storageBucket: "gen-lang-client-0276044322.firebasestorage.app",
+  messagingSenderId: "519533024289",
+  appId: "1:519533024289:web:76603cb68d776583133f60",
+  firestoreDatabaseId: "ai-studio-7f96f620-b672-4d89-9be5-5aaf4ec4c62c"
 };
 
 // Initialize Firebase using the config
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 // Database 1: The user's specified custom database (strictly targeted as requested)
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true
-}, "ai-studio-7f96f620-b672-4d89-9be5-5aaf4ec4c62c");
+export const db = initializeFirestore(app, { experimentalForceLongPolling: true }, "ai-studio-7f96f620-b672-4d89-9be5-5aaf4ec4c62c");
 
 // Database 2: The sandbox container auto-provisioned database ID (as dynamic fallback)
 export let dbEnv: any = null;
