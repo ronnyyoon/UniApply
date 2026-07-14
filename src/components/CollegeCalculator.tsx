@@ -13,9 +13,12 @@ import {
   ChevronRight, 
   HelpCircle,
   Eye,
-  EyeOff
+  EyeOff,
+  Database,
+  WifiOff
 } from 'lucide-react';
 import { Student } from '../types';
+import { fetchCollegeStats, CollegeStat, seedCollegeStats } from '../lib/firebase';
 
 interface YearlyData {
   recruitCount: string;
@@ -49,111 +52,23 @@ function yData(rc: string, min: string, max: string, avg: string, sd: string, cu
   return { recruitCount: rc, minGpa: min, maxGpa: max, avgGpa: avg, stdDev: sd, cut70: cut, chuhapMin: chMin, chuhapNo: chNo, ratio: rat };
 }
 
-// 17 Template Rows precisely matching the user's high-school consultant spreadsheet
-const TEMPLATE_ROWS: Omit<SimRow, 'studentGpa'>[] = [
-  {
-    id: 'row_1', region: '서울특별시', college: '서강대학교', major: '지식융합미디어학부', type: '학생부교과', detailType: '추천형', apply: 'O', recruitCount: '10',
-    data2025: yData('10', '1.27', '1.02', '1.17', '0.09', '1.57', '1.67', '35', '16.3'),
-    data2024: yData('7', '1.3', '1.12', '1.24', '0.08', '2.35', '5.42', '45', '6.43'),
-    data2023: yData('14', '1.25', '1.07', '1.15', '0.07', '1.54', '1.93', '109', '7.79')
-  },
-  {
-    id: 'row_2', region: '서울특별시', college: '한양대학교', major: '건설환경공학과', type: '학생부교과', detailType: '추천형', apply: 'O', recruitCount: '6',
-    data2025: yData('6', '1.54', '1.42', '1.52', '0.06', '1.66', '1.71', '5', '18.3'),
-    data2024: yData('7', '최저 없음', '', '', '', '', '', '13', '6.7'),
-    data2023: yData('7', '', '', '', '', '', '', '12', '10')
-  },
-  {
-    id: 'row_3', region: '서울특별시', college: '건국대학교', major: '재료공학부', type: '학생부교과', detailType: '추천형', apply: 'O', recruitCount: '4',
-    data2025: yData('5', '1.81', '1.54', '1.7', '0.12', '1.75', '1.98', '9', '15.4'),
-    data2024: yData('23', '학과 개편됨', '', '', '', '1.82', '', '', ''),
-    data2023: yData('', '', '', '', '', '', '', '', '')
-  },
-  {
-    id: 'row_4', region: '서울특별시', college: '한양대학교', major: '도시공학과', type: '학생부교과', detailType: '추천형', apply: 'O', recruitCount: '5',
-    data2025: yData('5', '1.48', '1.3', '1.41', '0.08', '1.57', '1.67', '5', '16'),
-    data2024: yData('5', '최저 없음', '', '', '', '', '', '0', '7.2'),
-    data2023: yData('5', '', '', '', '', '', '', '0', '16.8')
-  },
-  {
-    id: 'row_5', region: '서울특별시', college: '서울시립대학교', major: '신소재공학과', type: '학생부교과', detailType: '추천형', apply: 'O', recruitCount: '5',
-    data2025: yData('5', '3.00', '', '1.69', '', '1.77', '', '1', '18'),
-    data2024: yData('5', '', '', '2.04', '', '', '', '', ''),
-    data2023: yData('', '', '', '1.67', '', '', '', '', '')
-  },
-  {
-    id: 'row_6', region: '서울특별시', college: '중앙대학교', major: '미디어커뮤니케이션학부', type: '학생부교과', detailType: '지역균형전형', apply: 'O', recruitCount: '9',
-    data2025: yData('9', '1.46', '1.29', '1.38', '0.06', '2.28', '2.35', '21', '13.1'),
-    data2024: yData('6', '1.47', '1.34', '1.40', '0.06', '1.62', '1.60', '16', '7.2'),
-    data2023: yData('6', '1.63', '1.22', '1.30', '0.05', '1.63', '1.65', '25', '14.6')
-  },
-  {
-    id: 'row_7', region: '서울특별시', college: '중앙대학교', major: '경영학과', type: '학생부교과', detailType: '지역균형전형', apply: 'O', recruitCount: '46',
-    data2025: yData('46', '', '', '1.61', '', '', '', '114', '10'),
-    data2024: yData('50', '', '', '1.55', '', '', '', '147', '5.2'),
-    data2023: yData('50', '', '', '1.60', '', '', '', '144', '6.6')
-  },
-  {
-    id: 'row_8', region: '서울특별시', college: '한양대학교', major: '인터컬리지학부', type: '학생부종합', detailType: '서류형', apply: 'O', recruitCount: '25',
-    data2025: yData('45', '', '', '2.19', '', '2.84', '', '', ''),
+// Helper function to create default blank rows
+const createDefaultRows = (studentGpa: string = ""): SimRow[] => {
+  return Array.from({ length: 5 }, (_, idx) => ({
+    id: `row_${idx + 1}`,
+    region: '',
+    college: '',
+    major: '',
+    type: '학생부교과',
+    detailType: '',
+    apply: 'O',
+    recruitCount: '',
+    studentGpa,
+    data2025: yData('', '', '', '', '', '', '', '', ''),
     data2024: yData('', '', '', '', '', '', '', '', ''),
     data2023: yData('', '', '', '', '', '', '', '', '')
-  },
-  {
-    id: 'row_9', region: '서울특별시', college: '고려대학교', major: '산업경영공학과', type: '학생부교과', detailType: '추천형', apply: 'O', recruitCount: '8',
-    data2025: yData('8', '', '', '', '', '1.39', '', '10', '13.5'),
-    data2024: yData('9', '', '', '', '', '1.50', '', '11', '21'),
-    data2023: yData('12', '', '', '', '', '1.82', '', '10', '18.3')
-  },
-  {
-    id: 'row_10', region: '서울특별시', college: '고려대학교', major: '건축학과', type: '학생부교과', detailType: '학교장추천', apply: 'O', recruitCount: '6',
-    data2025: yData('6', '', '', '', '', '1.47', '', '8', '8.33'),
-    data2024: yData('7', '1.47', '1.24', '1.36', '0.09', '1.56', '1.68', '13', '9.86'),
-    data2023: yData('9', '1.63', '1.12', '1.34', '0.17', '1.67', '1.89', '30', '12.56')
-  },
-  {
-    id: 'row_11', region: '서울특별시', college: '고려대학교', major: '지구환경과학과', type: '학생부교과', detailType: '추천형', apply: 'O', recruitCount: '4',
-    data2025: yData('4', '', '', '', '', '1.49', '', '12', '18.25'),
-    data2024: yData('6', '', '', '', '', '', '', '10', '17.83'),
-    data2023: yData('8', '', '', '', '', '1.81', '', '5', '22.6')
-  },
-  {
-    id: 'row_12', region: '서울특별시', college: '고려대학교', major: '융합에너지공학과', type: '학생부교과', detailType: '추천형', apply: 'O', recruitCount: '5',
-    data2025: yData('5', '', '', '', '', '1.40', '', '6', '16.4'),
-    data2024: yData('5', '', '', '', '', '1.66', '', '8', '9.4'),
-    data2023: yData('7', '', '', '', '', '1.62', '', '18', '10.7')
-  },
-  {
-    id: 'row_13', region: '서울특별시', college: '고려대학교', major: '기계공학과', type: '학생부교과', detailType: '추천형', apply: 'O', recruitCount: '21',
-    data2025: yData('21', '', '', '', '', '1.44', '', '32', '10.24'),
-    data2024: yData('23', '', '', '', '', '1.49', '', '39', '11.43'),
-    data2023: yData('30', '', '', '', '', '1.68', '', '65', '9')
-  },
-  {
-    id: 'row_14', region: '서울특별시', college: '성균관대학교', major: '공과계열', type: '학생부종합', detailType: '융합형', apply: 'O', recruitCount: '100',
-    data2025: yData('100', '', '', '2.11', '', '2.99', '', '421', '26.92'),
-    data2024: yData('150', '', '', '2.24', '', '2.80', '', '553', '22.19'),
-    data2023: yData('150', '', '', '2.23', '', '2.92', '', '', '14.12')
-  },
-  {
-    id: 'row_15', region: '서울특별시', college: '성균관대학교', major: '건설환경공학부', type: '학생부교과', detailType: '추천형', apply: 'O', recruitCount: '15',
-    data2025: yData('올해 신설학과', '', '', '', '', '', '', '', ''),
-    data2024: yData('', '', '', '', '', '', '', '', ''),
-    data2023: yData('', '', '', '', '', '', '', '', '')
-  },
-  {
-    id: 'row_16', region: '서울특별시', college: '한양대학교', major: '인터컬리지학부', type: '학생부종합', detailType: '', apply: 'O', recruitCount: '26',
-    data2025: yData('26', '1.38', '1.05', '1.25', '0.10', '1.57', '1.64', '77', '14.88'),
-    data2024: yData('32', '', '', '', '', '', '', '119', '5.09'),
-    data2023: yData('32', '', '', '', '', '', '', '142', '11.28')
-  },
-  {
-    id: 'row_17', region: '서울특별시', college: '중앙대학교', major: '경영학부', type: '학생부교과', detailType: '지역균형전형', apply: 'O', recruitCount: '46',
-    data2025: yData('46', '1.50', '1.15', '1.40', '0.08', '1.80', '', '', '10'),
-    data2024: yData('50', '1.47', '1.15', '1.37', '0.08', '1.82', '1.72', '', '5.2'),
-    data2023: yData('50', '1.48', '1.13', '1.36', '0.09', '1.74', '1.89', '', '6.58')
-  }
-];
+  }));
+};
 
 // Helper statistical functions for Normdist
 function erf(x: number): number {
@@ -281,7 +196,7 @@ interface CollegeCalculatorProps {
 export default function CollegeCalculator({ student, primaryColor }: CollegeCalculatorProps) {
   // Store spreadsheets in React State mapped by student id
   const [studentSpreadsheets, setStudentSpreadsheets] = useState<Record<string, SimRow[]>>(() => {
-    const saved = localStorage.getItem('ADMIT2027_COLLEGE_SHEETS');
+    const saved = localStorage.getItem('ADMIT2027_COLLEGE_SHEETS_V2');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -293,8 +208,146 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
   });
 
   useEffect(() => {
-    localStorage.setItem('ADMIT2027_COLLEGE_SHEETS', JSON.stringify(studentSpreadsheets));
+    localStorage.setItem('ADMIT2027_COLLEGE_SHEETS_V2', JSON.stringify(studentSpreadsheets));
   }, [studentSpreadsheets]);
+
+  // Firestore stats state
+  const [dbStats, setDbStats] = useState<CollegeStat[]>([]);
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [statsSource, setStatsSource] = useState<'firestore' | 'seed_data' | 'offline_fallback'>('firestore');
+  const [isSeeding, setIsSeeding] = useState(false);
+
+  const loadStats = () => {
+    setIsLoadingStats(true);
+    fetchCollegeStats().then(data => {
+      setDbStats(data);
+      setIsLoadingStats(false);
+      if (data.length > 0) {
+        const firstId = data[0].id;
+        if (firstId.startsWith('seed_')) {
+          setStatsSource('seed_data');
+        } else if (firstId.startsWith('offline_')) {
+          setStatsSource('offline_fallback');
+        } else {
+          setStatsSource('firestore');
+        }
+      }
+    }).catch(err => {
+      console.error(err);
+      setIsLoadingStats(false);
+      setStatsSource('offline_fallback');
+    });
+  };
+
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  const handleManualSeed = async () => {
+    if (window.confirm('Firestore 데이터베이스를 기본 대학 입시 결과 3개년 통계 데이터셋(서울대, 연세대, 고려대, 성균관대 등 40개+ 핵심 전형)으로 강제 초기화 및 동기화하시겠습니까?')) {
+      setIsSeeding(true);
+      try {
+        await seedCollegeStats();
+        alert('Firestore 입시 통계 데이터베이스 구축 및 실시간 동기화에 성공했습니다!');
+        loadStats();
+      } catch (err: any) {
+        console.error(err);
+        alert(`Firestore 동기화 중 오류가 발생했습니다: ${err.message}\n(만약 프로젝트의 일일 무료 쓰기 쿼터량이 초과되었다면, 리셋 시간까지는 로컬 백업 모드로 정상 안전 연동됩니다.)`);
+      } finally {
+        setIsSeeding(false);
+      }
+    }
+  };
+
+  // Cascade Select helper calculations
+  const getColleges = () => {
+    return Array.from(new Set(dbStats.map(s => s.college))).sort();
+  };
+
+  const getMajors = (collegeName: string) => {
+    if (!collegeName) return [];
+    return Array.from(new Set(dbStats.filter(s => s.college === collegeName).map(s => s.major))).sort();
+  };
+
+  const getTypes = (collegeName: string, majorName: string) => {
+    if (!collegeName || !majorName) return [];
+    return Array.from(new Set(dbStats.filter(s => s.college === collegeName && s.major === majorName).map(s => s.type))).sort();
+  };
+
+  const getDetailTypes = (collegeName: string, majorName: string, typeName: string) => {
+    if (!collegeName || !majorName || !typeName) return [];
+    return Array.from(new Set(dbStats.filter(s => s.college === collegeName && s.major === majorName && s.type === typeName).map(s => s.detailType))).sort();
+  };
+
+  const handleCascadeChange = (rowId: string, level: 'college' | 'major' | 'type' | 'detailType', value: string) => {
+    const updated = currentSheet.map(row => {
+      if (row.id !== rowId) return row;
+      const copy = { ...row };
+
+      if (level === 'college') {
+        copy.college = value;
+        copy.major = '';
+        copy.type = '';
+        copy.detailType = '';
+      } else if (level === 'major') {
+        copy.major = value;
+        copy.type = '';
+        copy.detailType = '';
+      } else if (level === 'type') {
+        copy.type = value;
+        copy.detailType = '';
+      } else if (level === 'detailType') {
+        copy.detailType = value;
+        
+        // Find matching statistics in our database
+        const match = dbStats.find(s => 
+          s.college === copy.college && 
+          s.major === copy.major && 
+          s.type === copy.type && 
+          s.detailType === value
+        );
+
+        if (match) {
+          copy.recruitCount = match.recruitCount2026 || '';
+          copy.data2025 = yData(
+            match.recruitCount2026 || '',
+            match.minGpa2026 || '',
+            match.maxGpa2026 || '',
+            match.avgGpa2026 || '',
+            match.stdDev2026 || '',
+            match.cut70_2026 || '',
+            match.chuhapMin2026 || '',
+            match.chuhapNo2026 || '',
+            match.ratio2026 || ''
+          );
+          copy.data2024 = yData(
+            match.recruitCount2025 || '',
+            match.minGpa2025 || '',
+            match.maxGpa2025 || '',
+            match.avgGpa2025 || '',
+            match.stdDev2025 || '',
+            match.cut70_2025 || '',
+            match.chuhapMin2025 || '',
+            match.chuhapNo2025 || '',
+            match.ratio2025 || ''
+          );
+          copy.data2023 = yData(
+            match.recruitCount2024 || '',
+            match.minGpa2024 || '',
+            match.maxGpa2024 || '',
+            match.avgGpa2024 || '',
+            match.stdDev2024 || '',
+            match.cut70_2024 || '',
+            match.chuhapMin2024 || '',
+            match.chuhapNo2024 || '',
+            match.ratio2024 || ''
+          );
+        }
+      }
+      return copy;
+    });
+    updateCurrentSheet(updated);
+  };
   
   // Year visibility toggles
   const [show2025, setShow2025] = useState(true);
@@ -306,12 +359,8 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
   // Initialize or fetch sheet for current student
   const currentSheet = useMemo(() => {
     if (!studentSpreadsheets[student.id]) {
-      // Lazy load standard template pre-populated with student's personal GPA
-      const populated = TEMPLATE_ROWS.map(row => ({
-        ...row,
-        studentGpa: student.gpa.toString()
-      }));
-      return populated;
+      // Lazy load standard template with 5 default blank rows pre-populated with student's personal GPA
+      return createDefaultRows(student.gpa.toString());
     }
     return studentSpreadsheets[student.id];
   }, [studentSpreadsheets, student.id, student.gpa]);
@@ -368,21 +417,8 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
   };
 
   const executeReset = () => {
-    const reseted = TEMPLATE_ROWS.map((row, idx) => ({
-      ...row,
-      id: `row_${idx + 1}`,
-      region: '',
-      college: '',
-      major: '',
-      type: '학생부교과' as const,
-      detailType: '',
-      apply: 'O' as const,
-      recruitCount: '',
-      studentGpa: student.gpa.toString(),
-      data2025: yData('', '', '', '', '', '', '', '', ''),
-      data2024: yData('', '', '', '', '', '', '', '', ''),
-      data2023: yData('', '', '', '', '', '', '', '', '')
-    }));
+    // Reset to exactly 5 empty rows with empty studentGpa
+    const reseted = createDefaultRows("");
     updateCurrentSheet(reseted);
     setShowResetConfirm(false);
   };
@@ -552,6 +588,60 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
           <p className="text-[11px] text-zinc-400 leading-relaxed max-w-3xl">
             한국대학교육협의회 전국수시 배치 지침과 동일하게 구성한 통합 시뮬레이터입니다. 각 년도별 최저, 최고, 평균, 표준편차 값을 직접 갱신하여 고등학교 교량 환산 등수와 내신 위치 판정을 즉석에서 연쇄 연산할 수 있습니다.
           </p>
+          <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
+            {statsSource === 'firestore' && (
+              <div className="flex items-center gap-2 bg-emerald-950/25 border border-emerald-500/30 px-3 py-1.5 rounded-lg">
+                <span className="flex h-2 w-2 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="text-[10px] font-bold text-emerald-400 font-sans flex items-center gap-1">
+                  <Database className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                  Firebase Firestore 원격 DB 연동 활성화 ({dbStats.length}개 전형 정보 실시간 연동됨)
+                </span>
+              </div>
+            )}
+
+            {statsSource === 'seed_data' && (
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2 bg-amber-950/25 border border-amber-500/30 px-3 py-1.5 rounded-lg">
+                  <span className="flex h-2 w-2 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                  </span>
+                  <span className="text-[10px] font-bold text-amber-400 font-sans flex items-center gap-1">
+                    <Database className="w-3.5 h-3.5 shrink-0 text-amber-500" />
+                    로컬 입시 통계 엔진 작동 중 ({dbStats.length}개 기본 데이터셋 탑재 완료 · 원격 DB 비어있음)
+                  </span>
+                </div>
+                <button
+                  disabled={isSeeding}
+                  onClick={handleManualSeed}
+                  className="px-2.5 py-1 text-[10px] font-black bg-amber-600 hover:bg-amber-500 border border-amber-400 text-white rounded transition-all cursor-pointer shadow disabled:opacity-50 no-print"
+                >
+                  {isSeeding ? 'Firestore 초기 구축 중...' : '원격 DB에 초기 통계 데이터 구축하기'}
+                </button>
+              </div>
+            )}
+
+            {statsSource === 'offline_fallback' && (
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2 bg-zinc-800/80 border border-zinc-700/80 px-3 py-1.5 rounded-lg">
+                  <span className="text-[10px] font-bold text-zinc-400 font-sans flex items-center gap-1">
+                    <WifiOff className="w-3.5 h-3.5 shrink-0 text-zinc-500" />
+                    오프라인 백업 엔진 작동 중 ({dbStats.length}개 대학 데이터 로드됨 · Firestore 쿼터 제한 또는 오프라인 상태)
+                  </span>
+                </div>
+                <button
+                  disabled={isSeeding}
+                  onClick={handleManualSeed}
+                  className="px-2.5 py-1 text-[10px] font-black bg-zinc-700 hover:bg-zinc-600 border border-zinc-500 text-zinc-300 rounded transition-all cursor-pointer shadow disabled:opacity-50 no-print"
+                >
+                  {isSeeding ? 'DB 동기화 진행 중...' : '원격 DB 강제 동기화 시도'}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-2.5 shrink-0 no-print">
@@ -811,9 +901,9 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
                 <th className="py-1 px-1 text-center border border-zinc-800/80 w-10">액션</th>
 
                 {/* 대비 분석 */}
-                <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 text-emerald-400 font-bold bg-[#1A1D20] tracking-tighter whitespace-nowrap">26년도</th>
-                <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 text-amber-400 font-bold bg-[#1A1D20] tracking-tighter whitespace-nowrap">25년도</th>
-                <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 text-rose-400 font-bold bg-[#1A1D20] tracking-tighter whitespace-nowrap">24년도</th>
+                <th className="py-1 px-1 text-center border border-zinc-800/80 w-11 text-emerald-400 font-bold bg-[#1A1D20] tracking-tighter leading-tight">26<br />년도</th>
+                <th className="py-1 px-1 text-center border border-zinc-800/80 w-11 text-amber-400 font-bold bg-[#1A1D20] tracking-tighter leading-tight">25<br />년도</th>
+                <th className="py-1 px-1 text-center border border-zinc-800/80 w-11 text-rose-400 font-bold bg-[#1A1D20] tracking-tighter leading-tight">24<br />년도</th>
 
                 {/* 2025 Year Details */}
                 {show2025 && (
@@ -825,10 +915,10 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">표준<br />편차</th>
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">추정<br />등수</th>
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-15 bg-zinc-950/80 text-zinc-400 font-bold leading-tight">내신<br />성적<br />위치</th>
-                    <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">70%<br />컷</th>
+                    <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">70%<br />CUT</th>
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">추합<br />최저</th>
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">추합<br />번호</th>
-                    <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">경쟁<br />률</th>
+                    <th className="py-1 px-1 text-center border border-zinc-800/80 w-16 bg-zinc-950/80 text-zinc-400 leading-tight whitespace-nowrap">경쟁률</th>
                   </>
                 )}
 
@@ -842,10 +932,10 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">표준<br />편차</th>
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">추정<br />등수</th>
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-15 bg-zinc-950/80 text-zinc-400 font-bold leading-tight">내신<br />성적<br />위치</th>
-                    <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">70%<br />컷</th>
+                    <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">70%<br />CUT</th>
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">추합<br />최저</th>
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">추합<br />번호</th>
-                    <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">경쟁<br />률</th>
+                    <th className="py-1 px-1 text-center border border-zinc-800/80 w-16 bg-zinc-950/80 text-zinc-400 leading-tight whitespace-nowrap">경쟁률</th>
                   </>
                 )}
 
@@ -859,10 +949,10 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">표준<br />편차</th>
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">추정<br />등수</th>
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-15 bg-zinc-950/80 text-zinc-400 font-bold leading-tight">내신<br />성적<br />위치</th>
-                    <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">70%<br />컷</th>
+                    <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">70%<br />CUT</th>
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">추합<br />최저</th>
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">추합<br />번호</th>
-                    <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">경쟁<br />률</th>
+                    <th className="py-1 px-1 text-center border border-zinc-800/80 w-16 bg-zinc-950/80 text-zinc-400 leading-tight whitespace-nowrap">경쟁률</th>
                   </>
                 )}
               </tr>
@@ -884,37 +974,44 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
                     
                     {/* College Input */}
                     <td className="py-1 px-1.5 border border-zinc-800/80 font-semibold">
-                      <input 
+                      <select 
                         disabled={isExcluded}
-                        type="text" 
                         value={row.college}
-                        onChange={(e) => handleCellChange(row.id, ['college'], e.target.value)}
-                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-yellow-500 text-white focus:outline-none font-bold rounded p-0.5 truncate"
-                        placeholder="가용 대학명"
-                      />
+                        onChange={(e) => handleCascadeChange(row.id, 'college', e.target.value)}
+                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-yellow-500 text-white focus:outline-none font-bold rounded p-0.5"
+                      >
+                        <option value="" className="bg-zinc-950 text-zinc-500">대학 선택</option>
+                        {getColleges().map(c => (
+                          <option key={c} value={c} className="bg-zinc-950 text-white font-bold">{c}</option>
+                        ))}
+                      </select>
                     </td>
 
                     {/* Major Input */}
                     <td className="py-1 px-1.5 border border-zinc-800/80 text-zinc-200">
-                      <input 
-                        disabled={isExcluded}
-                        type="text" 
+                      <select 
+                        disabled={isExcluded || !row.college}
                         value={row.major}
-                        onChange={(e) => handleCellChange(row.id, ['major'], e.target.value)}
-                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-yellow-500 text-zinc-300 focus:outline-none rounded p-0.5 truncate"
-                        placeholder="희망 전공 기입"
-                      />
+                        onChange={(e) => handleCascadeChange(row.id, 'major', e.target.value)}
+                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-yellow-500 text-zinc-300 focus:outline-none rounded p-0.5 disabled:opacity-45"
+                      >
+                        <option value="" className="bg-zinc-950 text-zinc-500">전공 선택</option>
+                        {getMajors(row.college).map(m => (
+                          <option key={m} value={m} className="bg-zinc-950 text-white">{m}</option>
+                        ))}
+                      </select>
                     </td>
 
                     {/* Admission Type Select */}
                     <td className="py-1 px-1.5 border border-zinc-800/80 font-semibold text-yellow-500/90 text-[10.5px]">
                       <select 
-                        disabled={isExcluded}
+                        disabled={isExcluded || !row.major}
                         value={row.type}
-                        onChange={(e) => handleCellChange(row.id, ['type'], e.target.value)}
-                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-yellow-500 text-yellow-500 text-[10.5px] rounded focus:outline-none p-0.5"
+                        onChange={(e) => handleCascadeChange(row.id, 'type', e.target.value)}
+                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-yellow-500 text-yellow-500 text-[10.5px] rounded focus:outline-none p-0.5 disabled:opacity-45"
                       >
-                        {ADMISSION_TYPES.map(tp => (
+                        <option value="" className="bg-zinc-950 text-zinc-500">전형유형</option>
+                        {getTypes(row.college, row.major).map(tp => (
                           <option key={tp} className="bg-zinc-950 text-white text-[11px]" value={tp}>{tp}</option>
                         ))}
                       </select>
@@ -922,14 +1019,17 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
 
                     {/* Detail Type Input */}
                     <td className="py-1 px-1.5 border border-zinc-800/80">
-                      <input 
-                        disabled={isExcluded}
-                        type="text" 
+                      <select 
+                        disabled={isExcluded || !row.type}
                         value={row.detailType}
-                        onChange={(e) => handleCellChange(row.id, ['detailType'], e.target.value)}
-                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-yellow-500 text-zinc-400 focus:outline-none rounded p-0.5"
-                        placeholder="예: 추천형"
-                      />
+                        onChange={(e) => handleCascadeChange(row.id, 'detailType', e.target.value)}
+                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-yellow-500 text-zinc-400 focus:outline-none rounded p-0.5 disabled:opacity-45"
+                      >
+                        <option value="" className="bg-zinc-950 text-zinc-500">세부전형</option>
+                        {getDetailTypes(row.college, row.major, row.type).map(dt => (
+                          <option key={dt} className="bg-zinc-950 text-white text-[11px]" value={dt}>{dt}</option>
+                        ))}
+                      </select>
                     </td>
 
                     {/* Row Recruit count */}

@@ -1,0 +1,34 @@
+{
+  "entities": {
+    "CollegeStat": {
+      "title": "College Admission Result",
+      "description": "Admissions results statistics for a specific college, major, type, and detailType.",
+      "type": "object",
+      "properties": {
+        "college": { "type": "string", "description": "University name" },
+        "major": { "type": "string", "description": "Major / Department" },
+        "type": { "type": "string", "description": "Admission type" },
+        "detailType": { "type": "string", "description": "Detailed admission category" },
+        "recruitCount2026": { "type": "string", "description": "Recruitment count in 2026" },
+        "cut70_2026": { "type": "string", "description": "70% cut off in 2026" },
+        "chuhapNo2026": { "type": "string", "description": "Chuhap (additional path number) in 2026" },
+        "ratio2026": { "type": "string", "description": "Competition ratio in 2026" },
+        "recruitCount2025": { "type": "string", "description": "Recruitment count in 2025" },
+        "cut70_2025": { "type": "string", "description": "70% cut off in 2025" },
+        "chuhapNo2025": { "type": "string", "description": "Chuhap in 2025" },
+        "ratio2025": { "type": "string", "description": "Competition ratio in 2025" },
+        "recruitCount2024": { "type": "string", "description": "Recruitment count in 2024" },
+        "cut70_2024": { "type": "string", "description": "70% cut off in 2024" },
+        "chuhapNo2024": { "type": "string", "description": "Chuhap in 2024" },
+        "ratio2024": { "type": "string", "description": "Competition ratio in 2024" }
+      },
+      "required": ["college", "major", "type", "detailType"]
+    }
+  },
+  "firestore": {
+    "college_stats": {
+      "schema": "CollegeStat",
+      "description": "Collection of university admission statistics across multiple years"
+    }
+  }
+}
