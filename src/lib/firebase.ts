@@ -41,7 +41,7 @@ export interface CollegeStat {
   avgGpa2026?: string;
 }
 
-// 7. [수정] 실제 파이어베이스 DB 필드명(universityName 등)을 화면 규격(college 등)에 맞게 번역 매핑
+// 7. [수정] 필드명 뒤에 연도가 붙어있거나(recruitCount2026) 붙어있지 않더라도(recruitCount) 둘 다 안전하게 매핑
 export async function fetchCollegeStats(): Promise<CollegeStat[]> {
   try {
     const querySnapshot = await getDocs(collection(db, "officialStats"));
@@ -49,17 +49,26 @@ export async function fetchCollegeStats(): Promise<CollegeStat[]> {
     
     querySnapshot.forEach((doc) => {
       const data = doc.data();
+      
+      // 값이 undefined이거나 null인 경우를 방지하기 위해 빈 문자열 혹은 대시(-) 처리
+      const getSafeValue = (val: any) => {
+        if (val === undefined || val === null) return "-";
+        return String(val);
+      };
+
       stats.push({
         id: doc.id,
-        // DB의 실제 필드명이 universityName/departmentName 형태일 때 안전하게 매핑 (없으면 대피값 적용)
+        // 드롭다운 연동 필드 매핑
         college: data.universityName || data.college || "",
         major: data.departmentName || data.major || "",
         type: data.admissionType || data.type || "",
         detailType: data.detailedType || data.detailType || "",
-        recruitCount2026: String(data.recruitCount2026 || data.recruitCount || "0"),
-        cut70_2026: String(data.cut70_2026 || data.cut70 || "-"),
-        chuhapNo2026: String(data.chuhapNo2026 || data.chuhapNo || "-"),
-        ratio2026: String(data.ratio2026 || data.ratio || "-"),
+        
+        // 표 수치 데이터 매핑 (2026 접미사가 붙은 경우와 안 붙은 경우 모두 대응)
+        recruitCount2026: getSafeValue(data.recruitCount2026 !== undefined ? data.recruitCount2026 : data.recruitCount),
+        cut70_2026: getSafeValue(data.cut70_2026 !== undefined ? data.cut70_2026 : data.cut70),
+        chuhapNo2026: getSafeValue(data.chuhapNo2026 !== undefined ? data.chuhapNo2026 : data.chuhapNo),
+        ratio2026: getSafeValue(data.ratio2026 !== undefined ? data.ratio2026 : data.ratio),
         avgGpa2026: data.avgGpa2026 ? String(data.avgGpa2026) : undefined
       });
     });
