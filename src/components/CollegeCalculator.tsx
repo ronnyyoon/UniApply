@@ -974,62 +974,74 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
                     
                     {/* College Input */}
                     <td className="py-1 px-1.5 border border-zinc-800/80 font-semibold">
-                      <select 
+                      <input 
                         disabled={isExcluded}
+                        type="text"
+                        list={`colleges-${row.id}`}
                         value={row.college}
                         onChange={(e) => handleCascadeChange(row.id, 'college', e.target.value)}
-                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-yellow-500 text-white focus:outline-none font-bold rounded p-0.5"
-                      >
-                        <option value="" className="bg-zinc-950 text-zinc-500">대학 선택</option>
+                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-yellow-500 text-white focus:outline-none font-bold rounded p-0.5 text-[11px]"
+                        placeholder="대학 입력/선택"
+                      />
+                      <datalist id={`colleges-${row.id}`}>
                         {getColleges().map(c => (
-                          <option key={c} value={c} className="bg-zinc-950 text-white font-bold">{c}</option>
+                          <option key={c} value={c} />
                         ))}
-                      </select>
+                      </datalist>
                     </td>
 
                     {/* Major Input */}
                     <td className="py-1 px-1.5 border border-zinc-800/80 text-zinc-200">
-                      <select 
-                        disabled={isExcluded || !row.college}
+                      <input 
+                        disabled={isExcluded}
+                        type="text"
+                        list={`majors-${row.id}`}
                         value={row.major}
                         onChange={(e) => handleCascadeChange(row.id, 'major', e.target.value)}
-                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-yellow-500 text-zinc-300 focus:outline-none rounded p-0.5 disabled:opacity-45"
-                      >
-                        <option value="" className="bg-zinc-950 text-zinc-500">전공 선택</option>
+                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-yellow-500 text-zinc-300 focus:outline-none rounded p-0.5 text-[11px] disabled:opacity-45"
+                        placeholder="전공 입력/선택"
+                      />
+                      <datalist id={`majors-${row.id}`}>
                         {getMajors(row.college).map(m => (
-                          <option key={m} value={m} className="bg-zinc-950 text-white">{m}</option>
+                          <option key={m} value={m} />
                         ))}
-                      </select>
+                      </datalist>
                     </td>
 
                     {/* Admission Type Select */}
                     <td className="py-1 px-1.5 border border-zinc-800/80 font-semibold text-yellow-500/90 text-[10.5px]">
-                      <select 
-                        disabled={isExcluded || !row.major}
+                      <input 
+                        disabled={isExcluded}
+                        type="text"
+                        list={`types-${row.id}`}
                         value={row.type}
                         onChange={(e) => handleCascadeChange(row.id, 'type', e.target.value)}
                         className="w-full bg-transparent border-0 focus:ring-1 focus:ring-yellow-500 text-yellow-500 text-[10.5px] rounded focus:outline-none p-0.5 disabled:opacity-45"
-                      >
-                        <option value="" className="bg-zinc-950 text-zinc-500">전형유형</option>
-                        {getTypes(row.college, row.major).map(tp => (
-                          <option key={tp} className="bg-zinc-950 text-white text-[11px]" value={tp}>{tp}</option>
+                        placeholder="전형유형 입력/선택"
+                      />
+                      <datalist id={`types-${row.id}`}>
+                        {(row.college && row.major ? getTypes(row.college, row.major) : ADMISSION_TYPES).map(tp => (
+                          <option key={tp} value={tp} />
                         ))}
-                      </select>
+                      </datalist>
                     </td>
 
                     {/* Detail Type Input */}
                     <td className="py-1 px-1.5 border border-zinc-800/80">
-                      <select 
-                        disabled={isExcluded || !row.type}
+                      <input 
+                        disabled={isExcluded}
+                        type="text"
+                        list={`detailTypes-${row.id}`}
                         value={row.detailType}
                         onChange={(e) => handleCascadeChange(row.id, 'detailType', e.target.value)}
-                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-yellow-500 text-zinc-400 focus:outline-none rounded p-0.5 disabled:opacity-45"
-                      >
-                        <option value="" className="bg-zinc-950 text-zinc-500">세부전형</option>
+                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-yellow-500 text-zinc-400 focus:outline-none rounded p-0.5 text-[11px] disabled:opacity-45"
+                        placeholder="세부전형 입력/선택"
+                      />
+                      <datalist id={`detailTypes-${row.id}`}>
                         {getDetailTypes(row.college, row.major, row.type).map(dt => (
-                          <option key={dt} className="bg-zinc-950 text-white text-[11px]" value={dt}>{dt}</option>
+                          <option key={dt} value={dt} />
                         ))}
-                      </select>
+                      </datalist>
                     </td>
 
                     {/* Row Recruit count */}
