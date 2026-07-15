@@ -15,10 +15,12 @@ import {
   Eye,
   EyeOff,
   Database,
-  WifiOff
+  WifiOff,
+  Info
 } from 'lucide-react';
 import { Student } from '../types';
 import { fetchCollegeStats, CollegeStat, seedCollegeStats } from '../lib/firebase';
+import universityData from '../university_stats.json';
 
 interface YearlyData {
   recruitCount: string;
@@ -308,7 +310,7 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
         );
 
         if (match) {
-          copy.recruitCount = match.recruitCount2026 || '';
+          copy.recruitCount = '';
           copy.data2025 = yData(
             match.recruitCount2026 || '',
             match.minGpa2026 || '',
@@ -355,6 +357,127 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
   const [show2023, setShow2023] = useState(true);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [selectedMockMonth, setSelectedMockMonth] = useState<string>('3월');
+
+  // State for the White-themed overlay showing 3-year statistical trends
+  const [activeOverlayData, setActiveOverlayData] = useState<{
+    college: string;
+    major: string;
+    type: string;
+    detailType: string;
+    stats2024: any;
+    stats2025: any;
+    stats2026: any;
+  } | null>(null);
+
+  // Helper functions for parsing and calculating trends
+  const parseNum = (val: any): number | null => {
+    if (val === undefined || val === null || val === "") return null;
+    const num = parseFloat(String(val).replace(/[^0-9.]/g, ''));
+    return isNaN(num) ? null : num;
+  };
+
+  const getWaitlistPct = (enrollment: any, waitlist: any): number | null => {
+    const e = parseNum(enrollment);
+    const w = parseNum(waitlist);
+    if (e === null || w === null || e === 0) return null;
+    return (w / e) * 100;
+  };
+
+  const getTrend = (v24Val: any, v25Val: any, v26Val: any, type: 'recruit' | 'ratio' | 'score' | 'waitlist'): { text: string; className: string } => {
+    const v24 = parseNum(v24Val);
+    const v25 = parseNum(v25Val);
+    const v26 = parseNum(v26Val);
+
+    // Trend requires all 3 years to have valid data
+    if (v24 === null || v25 === null || v26 === null) {
+      return { text: "", className: "" };
+    }
+
+    if (type === 'recruit' || type === 'waitlist') {
+      if (v24 < v25 && v25 < v26) {
+        return { text: "증가", className: "text-blue-600 font-extrabold bg-blue-50 px-2 py-0.5 rounded border border-blue-200 text-[11px]" };
+      }
+      if (v24 > v25 && v25 > v26) {
+        return { text: "감소", className: "text-red-600 font-extrabold bg-red-50 px-2 py-0.5 rounded border border-red-200 text-[11px]" };
+      }
+      if (v24 === v25 && v25 === v26) {
+        return { text: "동일", className: "text-amber-600 font-extrabold bg-amber-50 px-2 py-0.5 rounded border border-amber-200 text-[11px]" };
+      }
+    } else if (type === 'ratio') {
+      if (v24 < v25 && v25 < v26) {
+        return { text: "증가", className: "text-red-600 font-extrabold bg-red-50 px-2 py-0.5 rounded border border-red-200 text-[11px]" };
+      }
+      if (v24 > v25 && v25 > v26) {
+        return { text: "감소", className: "text-blue-600 font-extrabold bg-blue-50 px-2 py-0.5 rounded border border-blue-200 text-[11px]" };
+      }
+      if (v24 === v25 && v25 === v26) {
+        return { text: "동일", className: "text-amber-600 font-extrabold bg-amber-50 px-2 py-0.5 rounded border border-amber-200 text-[11px]" };
+      }
+    } else if (type === 'score') {
+      // Small is better = 상승 (red)
+      // Large is worse = 하락 (blue)
+      if (v24 > v25 && v25 > v26) {
+        return { text: "상승", className: "text-red-600 font-extrabold bg-red-50 px-2 py-0.5 rounded border border-red-200 text-[11px]" };
+      }
+      if (v24 < v25 && v25 < v26) {
+        return { text: "하락", className: "text-blue-600 font-extrabold bg-blue-50 px-2 py-0.5 rounded border border-blue-200 text-[11px]" };
+      }
+      if (v24 === v25 && v25 === v26) {
+        return { text: "동일", className: "text-amber-600 font-extrabold bg-amber-50 px-2 py-0.5 rounded border border-amber-200 text-[11px]" };
+      }
+    }
+
+    return { text: "", className: "" };
+  };
+
+  const formatWaitlist = (enrollment: any, waitlist: any) => {
+    const e = parseNum(enrollment);
+    const w = parseNum(waitlist);
+    if (w === null) return "-";
+    if (e === null || e === 0) return `${w}명`;
+    const pct = Math.round((w / e) * 100);
+    return `${w}명 (${pct}%)`;
+  };
+
+  const handleRowIndexClick = (row: SimRow) => {
+    if (!row.college || !row.major || !row.type || !row.detailType) {
+      alert("일치하는 자료가 없습니다.");
+      return;
+    }
+
+    const match = (universityData as any[]).find((data: any) => {
+      const uName = data.universityName || data.college || "";
+      const dName = data.departmentName || data.major || "";
+      const aType = data.admissionType || data.type || "";
+      const detType = data.detailedType || data.detailType || "";
+      return (
+        uName.trim() === row.college.trim() &&
+        dName.trim() === row.major.trim() &&
+        aType.trim() === row.type.trim() &&
+        detType.trim() === row.detailType.trim()
+      );
+    });
+
+    if (!match) {
+      alert("일치하는 자료가 없습니다.");
+      return;
+    }
+
+    const statsObj = match.stats || {};
+    const stats2024 = statsObj['2024'] || {};
+    const stats2025 = statsObj['2025'] || {};
+    const stats2026 = statsObj['2026'] || {};
+
+    setActiveOverlayData({
+      college: row.college,
+      major: row.major,
+      type: row.type,
+      detailType: row.detailType,
+      stats2024,
+      stats2025,
+      stats2026
+    });
+  };
 
   // Initialize or fetch sheet for current student
   const currentSheet = useMemo(() => {
@@ -677,7 +800,7 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-stretch no-print">
         
         {/* Left Side: 수능 최저 영역 등급 합산 분석 (Tabbed Interface) */}
-        <div className="xl:col-span-7 bg-zinc-900/50 border professional-border rounded-xl p-4 space-y-4 shadow-xl flex flex-col justify-between text-[11px]">
+        <div className="xl:col-span-7 bg-zinc-900/50 border professional-border rounded-xl p-4 space-y-4 shadow-xl flex flex-col justify-between text-[11px] relative overflow-hidden min-h-[420px]">
           <div className="space-y-3">
             {/* Elegant Header */}
             <div className="flex items-center justify-between pb-2 border-b border-zinc-800/80">
@@ -785,6 +908,163 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
               </table>
             </div>
           </div>
+
+          {/* Help Banner at the bottom empty space of the left column */}
+          <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-lg p-3 flex items-center gap-2 mt-auto select-none no-print">
+            <Info className="w-4 h-4 text-indigo-400 shrink-0" />
+            <span className="text-zinc-300 text-[11px] font-bold leading-normal">
+              연번을 누르면 3개년 대학 입시 통계 상세자료를 확인할 수 있습니다.
+            </span>
+          </div>
+
+          {/* White-themed elegant statistical overlay */}
+          {activeOverlayData && (
+            <div className="absolute inset-0 bg-white z-20 flex flex-col p-4 md:p-5 text-slate-800 animate-in fade-in zoom-in-95 duration-200 overflow-y-auto">
+              <div className="flex flex-col h-full space-y-4">
+                <div>
+                  {/* Overlay Title & Close Button */}
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-200 mb-3 shrink-0">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 inline-block animate-pulse"></span>
+                      <h3 className="text-xs md:text-sm font-black text-slate-900 tracking-wider">
+                        3개년 대학 입시 통계 상세자료
+                      </h3>
+                    </div>
+                    <button 
+                      onClick={() => setActiveOverlayData(null)}
+                      className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors cursor-pointer select-none"
+                    >
+                      닫기 (X)
+                    </button>
+                  </div>
+
+                  {/* Header Details Table */}
+                  <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50 mb-4 shadow-sm text-xs md:text-[13px]">
+                    <table className="w-full text-center border-collapse">
+                      <tbody>
+                        <tr className="border-b border-slate-200">
+                          <td className="w-[15%] bg-slate-100 font-extrabold text-slate-600 py-2 border-r border-slate-200 select-none">대학</td>
+                          <td className="w-[35%] py-2 border-r border-slate-200 text-left px-3 font-black text-slate-900">{activeOverlayData.college}</td>
+                          <td className="w-[15%] bg-slate-100 font-extrabold text-slate-600 py-2 border-r border-slate-200 select-none">모집단위</td>
+                          <td className="w-[35%] py-2 text-left px-3 font-black text-slate-900">{activeOverlayData.major}</td>
+                        </tr>
+                        <tr>
+                          <td className="bg-slate-100 font-extrabold text-slate-600 py-2 border-r border-slate-200 select-none">전형유형</td>
+                          <td className="py-2 border-r border-slate-200 text-left px-3 font-bold text-amber-600">{activeOverlayData.type}</td>
+                          <td className="bg-slate-100 font-extrabold text-slate-600 py-2 border-r border-slate-200 select-none">세부전형</td>
+                          <td className="py-2 text-left px-3 font-bold text-slate-700">{activeOverlayData.detailType}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Trend Table */}
+                  <div className="overflow-hidden rounded-lg border border-slate-200 shadow-sm text-xs md:text-[13px]">
+                    <table className="w-full text-center border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100 text-slate-700 font-extrabold border-b border-slate-200">
+                          <th className="py-2 px-1.5 border-r border-slate-200 w-[20%]">구분</th>
+                          <th className="py-2 px-1.5 border-r border-slate-200 w-[20%]">2024학년도</th>
+                          <th className="py-2 px-1.5 border-r border-slate-200 w-[20%]">2025학년도</th>
+                          <th className="py-2 px-1.5 border-r border-slate-200 w-[20%]">2026학년도</th>
+                          <th className="py-2 px-1.5 w-[20%]">3개년 추이</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 font-semibold">
+                        {/* 1. 모집인원 */}
+                        <tr>
+                          <td className="py-2 px-1.5 bg-slate-50 font-bold border-r border-slate-200 text-slate-700">모집인원</td>
+                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2024.enrollment ? `${activeOverlayData.stats2024.enrollment}명` : '-'}</td>
+                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2025.enrollment ? `${activeOverlayData.stats2025.enrollment}명` : '-'}</td>
+                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2026.enrollment ? `${activeOverlayData.stats2026.enrollment}명` : '-'}</td>
+                          <td className="py-2 px-1.5 font-bold">
+                            {(() => {
+                              const trend = getTrend(activeOverlayData.stats2024.enrollment, activeOverlayData.stats2025.enrollment, activeOverlayData.stats2026.enrollment, 'recruit');
+                              return trend.text ? <span className={trend.className}>{trend.text}</span> : <span className="text-slate-400">-</span>;
+                            })()}
+                          </td>
+                        </tr>
+                        {/* 2. 경쟁률 */}
+                        <tr>
+                          <td className="py-2 px-1.5 bg-slate-50 font-bold border-r border-slate-200 text-slate-700">경쟁률</td>
+                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2024.competitionRate ? `${activeOverlayData.stats2024.competitionRate}:1` : '-'}</td>
+                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2025.competitionRate ? `${activeOverlayData.stats2025.competitionRate}:1` : '-'}</td>
+                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2026.competitionRate ? `${activeOverlayData.stats2026.competitionRate}:1` : '-'}</td>
+                          <td className="py-2 px-1.5 font-bold">
+                            {(() => {
+                              const trend = getTrend(activeOverlayData.stats2024.competitionRate, activeOverlayData.stats2025.competitionRate, activeOverlayData.stats2026.competitionRate, 'ratio');
+                              return trend.text ? <span className={trend.className}>{trend.text}</span> : <span className="text-slate-400">-</span>;
+                            })()}
+                          </td>
+                        </tr>
+                        {/* 3. 평균 */}
+                        <tr>
+                          <td className="py-2 px-1.5 bg-slate-50 font-bold border-r border-slate-200 text-slate-700">평균</td>
+                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2024.average || '-'}</td>
+                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2025.average || '-'}</td>
+                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2026.average || '-'}</td>
+                          <td className="py-2 px-1.5 font-bold">
+                            {(() => {
+                              const trend = getTrend(activeOverlayData.stats2024.average, activeOverlayData.stats2025.average, activeOverlayData.stats2026.average, 'score');
+                              return trend.text ? <span className={trend.className}>{trend.text}</span> : <span className="text-slate-400">-</span>;
+                            })()}
+                          </td>
+                        </tr>
+                        {/* 4. 50% CUT */}
+                        <tr>
+                          <td className="py-2 px-1.5 bg-slate-50 font-bold border-r border-slate-200 text-slate-700">50% CUT</td>
+                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2024.cut50 || '-'}</td>
+                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2025.cut50 || '-'}</td>
+                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2026.cut50 || '-'}</td>
+                          <td className="py-2 px-1.5 font-bold">
+                            {(() => {
+                              const trend = getTrend(activeOverlayData.stats2024.cut50, activeOverlayData.stats2025.cut50, activeOverlayData.stats2026.cut50, 'score');
+                              return trend.text ? <span className={trend.className}>{trend.text}</span> : <span className="text-slate-400">-</span>;
+                            })()}
+                          </td>
+                        </tr>
+                        {/* 5. 70% CUT */}
+                        <tr>
+                          <td className="py-2 px-1.5 bg-slate-50 font-bold border-r border-slate-200 text-slate-700">70% CUT</td>
+                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2024.cut70 || '-'}</td>
+                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2025.cut70 || '-'}</td>
+                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2026.cut70 || '-'}</td>
+                          <td className="py-2 px-1.5 font-bold">
+                            {(() => {
+                              const trend = getTrend(activeOverlayData.stats2024.cut70, activeOverlayData.stats2025.cut70, activeOverlayData.stats2026.cut70, 'score');
+                              return trend.text ? <span className={trend.className}>{trend.text}</span> : <span className="text-slate-400">-</span>;
+                            })()}
+                          </td>
+                        </tr>
+                        {/* 6. 충원인원 */}
+                        <tr>
+                          <td className="py-2 px-1.5 bg-slate-50 font-bold border-r border-slate-200 text-slate-700">충원인원</td>
+                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">
+                            {formatWaitlist(activeOverlayData.stats2024.enrollment, activeOverlayData.stats2024.waitlistLastRank)}
+                          </td>
+                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">
+                            {formatWaitlist(activeOverlayData.stats2025.enrollment, activeOverlayData.stats2025.waitlistLastRank)}
+                          </td>
+                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">
+                            {formatWaitlist(activeOverlayData.stats2026.enrollment, activeOverlayData.stats2026.waitlistLastRank)}
+                          </td>
+                          <td className="py-2 px-1.5 font-bold">
+                            {(() => {
+                              const pct24 = getWaitlistPct(activeOverlayData.stats2024.enrollment, activeOverlayData.stats2024.waitlistLastRank);
+                              const pct25 = getWaitlistPct(activeOverlayData.stats2025.enrollment, activeOverlayData.stats2025.waitlistLastRank);
+                              const pct26 = getWaitlistPct(activeOverlayData.stats2026.enrollment, activeOverlayData.stats2026.waitlistLastRank);
+                              const trend = getTrend(pct24, pct25, pct26, 'waitlist');
+                              return trend.text ? <span className={trend.className}>{trend.text}</span> : <span className="text-slate-400">-</span>;
+                            })()}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right Side: 대교협 상담프로그램 범례 및 표시 색상 정보 */}
@@ -810,15 +1090,67 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
               </div>
             </div>
 
-            <div className="p-2 bg-zinc-950/30 rounded-lg border border-zinc-800 space-y-1 text-[10px]">
+            <div className="p-2 bg-zinc-950/30 rounded-lg border border-zinc-800 space-y-1.5 text-[10px]">
               <div className="font-bold text-zinc-400 flex items-center gap-1.5">
                 <AlertTriangle className="w-3.5 h-3.5 text-yellow-500 shrink-0" />
                 <span>지선 대비분석 산출 로직 조건식</span>
               </div>
-              <ul className="list-disc pl-4 space-y-0.5 text-[9.5px]/relaxed text-zinc-500">
-                <li><b>학생부교과</b>: S &lt; 최고일 경우 <b className="text-blue-400">과하</b>, 최고~평균 <b className="text-sky-400">하향</b>, 평균~최저 <b className="text-emerald-400">안전</b>, 최저~70%CUT <b className="text-amber-400">소신</b>, 70%CUT~추합최저 <b className="text-orange-400 font-extrabold">상향</b>, 이하 <b className="text-rose-400">과상</b></li>
-                <li><b>학종/논술/면접/실기</b>: S &lt; 최고일 경우 <b className="text-emerald-400">안전</b>, 최고~평균 <b className="text-amber-400">소신</b>, 평균~최저 <b className="text-orange-400 font-extrabold">상향</b>, 이하 <b className="text-rose-400">과상</b></li>
-              </ul>
+              <div className="overflow-hidden rounded border border-zinc-850 bg-zinc-950/40">
+                <table className="w-full text-center text-[8.5px] border-collapse leading-tight font-sans">
+                  <thead>
+                    <tr className="bg-zinc-900/80 text-zinc-400 font-extrabold border-b border-zinc-850">
+                      <th className="py-0.5 px-1 border-r border-zinc-850 w-[24%]">성적기준</th>
+                      <th className="py-0.5 px-1 border-r border-zinc-850 w-[38%]">학생부교과</th>
+                      <th className="py-0.5 px-1 w-[38%]">학종/논술 등</th>
+                    </tr>
+                  </thead>
+                  <tbody className="font-medium text-zinc-300">
+                    <tr className="border-b border-zinc-850/60">
+                      <td className="py-0.5 px-0.5 border-r border-zinc-850 text-zinc-500 font-extrabold text-[9.5px]">↑</td>
+                      <td className="py-0.5 px-0.5 border-r border-zinc-850 bg-blue-950/40 text-blue-400 font-extrabold text-[9px]">과하</td>
+                      <td className="py-0.5 px-0.5 bg-emerald-950/40 text-emerald-400 font-extrabold text-[9px]">안전</td>
+                    </tr>
+                    <tr className="border-b border-zinc-850/60">
+                      <td className="py-0.5 px-0.5 border-r border-zinc-850 text-zinc-400 font-bold">최고</td>
+                      <td className="py-0.5 px-0.5 border-r border-zinc-850 bg-sky-950/40 text-sky-400 font-extrabold text-[9px]" rowSpan={2}>하향</td>
+                      <td className="py-0.5 px-0.5 bg-amber-950/40 text-amber-500 font-extrabold text-[9px]" rowSpan={2}>소신</td>
+                    </tr>
+                    <tr className="border-b border-zinc-850/60">
+                      <td className="py-0.5 px-0.5 border-r border-zinc-850 text-zinc-500 text-[8px]">↕</td>
+                    </tr>
+                    <tr className="border-b border-zinc-850/60">
+                      <td className="py-0.5 px-0.5 border-r border-zinc-850 text-zinc-400 font-bold">평균</td>
+                      <td className="py-0.5 px-0.5 border-r border-zinc-850 bg-emerald-950/40 text-emerald-400 font-extrabold text-[9px]" rowSpan={2}>안전</td>
+                      <td className="py-0.5 px-0.5 bg-orange-950/40 text-orange-400 font-extrabold text-[9px]" rowSpan={2}>상향</td>
+                    </tr>
+                    <tr className="border-b border-zinc-850/60">
+                      <td className="py-0.5 px-0.5 border-r border-zinc-850 text-zinc-500 text-[8px]">↕</td>
+                    </tr>
+                    <tr className="border-b border-zinc-850/60">
+                      <td className="py-0.5 px-0.5 border-r border-zinc-850 text-zinc-400 font-bold">최저</td>
+                      <td className="py-0.5 px-0.5 border-r border-zinc-850 bg-amber-950/40 text-amber-500 font-extrabold text-[9px]" rowSpan={2}>소신</td>
+                      <td className="py-0.5 px-0.5 bg-rose-950/45 text-rose-400 font-extrabold text-[9px]" rowSpan={6}>과상</td>
+                    </tr>
+                    <tr className="border-b border-zinc-850/60">
+                      <td className="py-0.5 px-0.5 border-r border-zinc-850 text-zinc-500 text-[8px]">↕</td>
+                    </tr>
+                    <tr className="border-b border-zinc-850/60">
+                      <td className="py-0.5 px-0.5 border-r border-zinc-850 text-zinc-400 font-bold">70%</td>
+                      <td className="py-0.5 px-0.5 border-r border-zinc-850 bg-orange-950/40 text-orange-400 font-extrabold text-[9px]" rowSpan={2}>상향</td>
+                    </tr>
+                    <tr className="border-b border-zinc-850/60">
+                      <td className="py-0.5 px-0.5 border-r border-zinc-850 text-zinc-500 text-[8px]">↕</td>
+                    </tr>
+                    <tr className="border-b border-zinc-850/60">
+                      <td className="py-0.5 px-0.5 border-r border-zinc-850 text-zinc-400 font-bold text-[7.5px] scale-95 origin-center leading-none">추합최저</td>
+                      <td className="py-0.5 px-0.5 border-r border-zinc-850 bg-rose-950/40 text-rose-400 font-extrabold text-[9px]" rowSpan={2}>과상</td>
+                    </tr>
+                    <tr>
+                      <td className="py-0.5 px-0.5 border-r border-zinc-850 text-zinc-500 font-extrabold text-[9.5px]">↓</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
@@ -970,7 +1302,13 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
                 return (
                   <tr key={row.id} className={trClass}>
                     {/* Index */}
-                    <td className="py-1 px-1.5 text-center bg-zinc-950 text-zinc-500 border border-zinc-800/80 font-mono select-none">{row.index}</td>
+                    <td 
+                      className="py-1 px-1.5 text-center bg-zinc-950 text-zinc-400 hover:text-white hover:bg-zinc-900 border border-zinc-800/80 font-mono font-bold cursor-pointer select-none transition-all duration-150"
+                      onClick={() => handleRowIndexClick(row)}
+                      title="3개년 대학 입시 통계 상세 오버랩 보기"
+                    >
+                      {row.index}
+                    </td>
                     
                     {/* College Input */}
                     <td className="py-1 px-1.5 border border-zinc-800/80 font-semibold">
