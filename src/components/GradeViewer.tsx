@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   BookOpen, 
   TrendingUp, 
@@ -23,44 +23,49 @@ interface GradeViewerProps {
 export default function GradeViewer({ student, primaryColor }: GradeViewerProps) {
   const [activeSemesterTab, setActiveSemesterTab] = useState<string>('전체');
 
-  const semesters = ['1-1', '1-2', '2-1', '2-2', '3-1'];
+  // 해당 학생이 실제로 이수한 학기들만 동적으로 추출 (누락되거나 미이수한 학기는 목록 및 차트에서 배제)
+  const semesters = useMemo(() => {
+    const sems = new Set(student.grades.map(g => g.semester));
+    return ['1-1', '1-2', '2-1', '2-2', '3-1'].filter(sem => sems.has(sem));
+  }, [student]);
 
-  // 주요 과목군별 평균 등급 계산 (국어, 수학, 영어, 탐구)
-  const subjectGroupAverages = useMemo(() => {
-    const groups: Record<string, { totalUnits: number; weightedSum: number }> = {
-      '국어': { totalUnits: 0, weightedSum: 0 },
-      '수학': { totalUnits: 0, weightedSum: 0 },
-      '영어': { totalUnits: 0, weightedSum: 0 },
-      '탐구': { totalUnits: 0, weightedSum: 0 },
-    };
+  useEffect(() => {
+    if (activeSemesterTab !== '전체' && !semesters.includes(activeSemesterTab)) {
+      setActiveSemesterTab('전체');
+    }
+  }, [student, semesters, activeSemesterTab]);
 
-    student.grades.forEach(g => {
-      let mappedGroup = '';
-      if (g.subject.includes('국어') || g.subject === '독서' || g.subject === '문학') {
-        mappedGroup = '국어';
-      } else if (g.subject.includes('수학') || g.subject.includes('수학I') || g.subject.includes('수학II')) {
-        mappedGroup = '수학';
-      } else if (g.subject.includes('영어') || g.subject.includes('심화영어')) {
-        mappedGroup = '영어';
-      } else if (g.subject.includes('사회') || g.subject.includes('과학') || g.subject.includes('물리') || g.subject.includes('화학') || g.subject.includes('생명') || g.subject.includes('지구')) {
-        mappedGroup = '탐구';
-      }
+  const totalAllUnits = useMemo(() => {
+    return student.grades.reduce((sum, g) => sum + g.unit, 0);
+  }, [student]);
 
-      if (mappedGroup && groups[mappedGroup]) {
-        groups[mappedGroup].totalUnits += g.unit;
-        groups[mappedGroup].weightedSum += g.rank * g.unit;
-      }
-    });
+  // 과목기준별 성적산출 계산 (전과목, 상위10개과목, 상위5개과목)
+  const calculatedGpas = useMemo(() => {
+    const grades = student.grades;
+    
+    // 1. 전과목 평균 (전체 등급)
+    const totalAllUnits = grades.reduce((sum, g) => sum + g.unit, 0);
+    const totalAllWeighted = grades.reduce((sum, g) => sum + g.rank * g.unit, 0);
+    const gpaAll = totalAllUnits > 0 ? Math.round((totalAllWeighted / totalAllUnits) * 100) / 100 : 0;
 
-    const result: Record<string, number> = {};
-    Object.keys(groups).forEach(key => {
-      const group = groups[key];
-      result[key] = group.totalUnits > 0 
-        ? Math.round((group.weightedSum / group.totalUnits) * 100) / 100 
-        : 0;
-    });
+    // 2. 상위 10개 과목
+    const sortedByRank = [...grades].sort((a, b) => a.rank - b.rank);
+    const top10 = sortedByRank.slice(0, 10);
+    const total10Units = top10.reduce((sum, g) => sum + g.unit, 0);
+    const total10Weighted = top10.reduce((sum, g) => sum + g.rank * g.unit, 0);
+    const gpaTop10 = total10Units > 0 ? Math.round((total10Weighted / total10Units) * 100) / 100 : 0;
 
-    return result;
+    // 3. 상위 5개 과목
+    const top5 = sortedByRank.slice(0, 5);
+    const total5Units = top5.reduce((sum, g) => sum + g.unit, 0);
+    const total5Weighted = top5.reduce((sum, g) => sum + g.rank * g.unit, 0);
+    const gpaTop5 = total5Units > 0 ? Math.round((total5Weighted / total5Units) * 100) / 100 : 0;
+
+    return [
+      { key: 'all', label: '전과목', val: gpaAll },
+      { key: 'top10', label: '상위 10개 과목', val: gpaTop10 },
+      { key: 'top5', label: '상위 5개 과목', val: gpaTop5 }
+    ];
   }, [student]);
 
   // 필터링된 성적 목록
@@ -120,7 +125,7 @@ export default function GradeViewer({ student, primaryColor }: GradeViewerProps)
             <div className="w-px h-8 bg-[#222]"></div>
             <div className="text-center px-2">
               <div className="text-[10px] text-zinc-500 font-bold uppercase">총 취득단위</div>
-              <div className="text-lg font-black text-white font-mono">112 <span className="text-xs text-zinc-500">단위</span></div>
+              <div className="text-lg font-black text-white font-mono">{totalAllUnits} <span className="text-xs text-zinc-500">단위</span></div>
             </div>
           </div>
         </div>
@@ -199,15 +204,15 @@ export default function GradeViewer({ student, primaryColor }: GradeViewerProps)
         <div className="lg:col-span-7 professional-bg-card border professional-border rounded-xl p-5 space-y-4">
           <h3 className="text-xs font-bold text-zinc-400 flex items-center gap-1.5 uppercase">
             <Grid className="w-4 h-4 text-emerald-500" />
-            핵심 영역별 특성화 성적 (평균 등급)
+            과목기준별 성적산출
           </h3>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {Object.keys(subjectGroupAverages).map(group => {
-              const val = subjectGroupAverages[group];
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {calculatedGpas.map(item => {
+              const val = item.val;
               return (
-                <div key={group} className="p-4 bg-zinc-950/60 rounded-xl border professional-border space-y-2 text-center">
-                  <span className="text-[11px] font-bold text-zinc-500">{group}교과 영역</span>
+                <div key={item.key} className="p-4 bg-zinc-950/60 rounded-xl border professional-border space-y-2 text-center">
+                  <span className="text-[11px] font-bold text-zinc-500">{item.label}</span>
                   <div className="text-2xl font-black text-white font-mono tracking-tight">
                     {val > 0 ? `${val}등급` : '이수없음'}
                   </div>
@@ -243,7 +248,7 @@ export default function GradeViewer({ student, primaryColor }: GradeViewerProps)
 
           {/* 학기 탭 선택 */}
           <div className="flex items-center gap-1.5">
-            {['전체', '1-1', '1-2', '2-1', '2-2', '3-1'].map(tab => (
+            {['전체', ...semesters].map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveSemesterTab(tab)}

@@ -5,6 +5,7 @@
 
 import { Student, College, CMSArticle, AppSettings, GradeItem, MockGradeItem, StudentChoice } from './types';
 import { RAW_MOCK_3, RAW_MOCK_5, RAW_MOCK_6 } from './mockDataRaw';
+import { RAW_GRADES_CSV } from './rawGradesCsv';
 
 // 3학년 전체 명렬표 데이터 원본 (CSV 형식 멀티라인 문자열)
 export const RAW_STUDENT_LIST = `담임,학번,이름
@@ -626,11 +627,97 @@ const parsedMock3 = parseMockCsv(RAW_MOCK_3);
 const parsedMock5 = parseMockCsv(RAW_MOCK_5);
 const parsedMock6 = parseMockCsv(RAW_MOCK_6);
 
-// 명렬표 행을 파싱하여 정적 학생 리스트로 전환 및 랜덤 성적 시드 부여
+// 명렬표 행을 파싱하여 정적 학생 리스트로 전환 및 실제 내신 성적 연동
 export function buildStudentsFromRaw(): Student[] {
   const lines = RAW_STUDENT_LIST.trim().split('\n');
   const headers = lines[0].split(','); // 담임,학번,이름
   const students: Student[] = [];
+
+  // RAW_GRADES_CSV 파싱하여 성적 맵 구성
+  const csvRows = RAW_GRADES_CSV.trim().split('\n');
+  const gradesMap: Record<string, GradeItem[]> = {};
+
+  for (let r = 1; r < csvRows.length; r++) {
+    const rowLine = csvRows[r].trim();
+    if (!rowLine) continue;
+    const parts = rowLine.split(',');
+    if (parts.length < 9) continue;
+
+    const clsVal = parseInt(parts[0].trim());
+    const numVal = parseInt(parts[1].trim());
+    const gradeVal = parseInt(parts[3].trim());
+    const termVal = parseInt(parts[4].trim());
+    const subjectName = parts[6].trim();
+    const unitVal = parseInt(parts[7].trim());
+    const rankVal = parseInt(parts[8].trim());
+
+    if (isNaN(clsVal) || isNaN(numVal) || isNaN(gradeVal) || isNaN(termVal) || isNaN(unitVal) || isNaN(rankVal)) {
+      continue;
+    }
+
+    const stdId = "3" + clsVal + String(numVal).padStart(2, '0');
+    const semKey = `${gradeVal}-${termVal}`;
+
+    if (!gradesMap[stdId]) {
+      gradesMap[stdId] = [];
+    }
+
+    // 과목명 정제 (사용자 가독성 제고 및 통일성 부여)
+    let cleanedSubj = subjectName;
+    if (cleanedSubj.includes('화합과') || cleanedSubj.includes('화법과작문') || cleanedSubj.includes('ȭ')) {
+      cleanedSubj = '화법과 작문';
+    } else if (cleanedSubj.includes('미적분')) {
+      cleanedSubj = '미적분';
+    } else if (cleanedSubj.includes('영어독해와작문') || cleanedSubj.includes('영어 독해와') || cleanedSubj.includes('ؿ')) {
+      cleanedSubj = '영어 독해와 작문';
+    } else if (cleanedSubj.includes('통합사회') || cleanedSubj.includes('ջȸ')) {
+      cleanedSubj = '통합사회';
+    } else if (cleanedSubj.includes('통합과학') || cleanedSubj.includes('հ')) {
+      cleanedSubj = '통합과학';
+    } else if (cleanedSubj.includes('한문I') || cleanedSubj.includes('ѹ')) {
+      cleanedSubj = '한문I';
+    } else if (cleanedSubj.includes('일본어I') || cleanedSubj.includes('Ϻ')) {
+      cleanedSubj = '일본어I';
+    } else if (cleanedSubj.includes('중국어I') || cleanedSubj.includes('߱')) {
+      cleanedSubj = '중국어I';
+    } else if (cleanedSubj.includes('확률과 통계') || cleanedSubj.includes('Ȯ')) {
+      cleanedSubj = '확률과 통계';
+    } else if (cleanedSubj.includes('생명과학I') || cleanedSubj.includes('Х')) {
+      cleanedSubj = '생명과학I';
+    } else if (cleanedSubj.includes('지구과학I') || cleanedSubj.includes('ȭХ')) {
+      cleanedSubj = '지구과학I';
+    } else if (cleanedSubj.includes('독서')) {
+      cleanedSubj = '독서';
+    } else if (cleanedSubj.includes('문학')) {
+      cleanedSubj = '문학';
+    } else if (cleanedSubj.includes('한국사') || cleanedSubj.includes('ѱ')) {
+      cleanedSubj = '한국사';
+    } else if (cleanedSubj.includes('수학I')) {
+      cleanedSubj = '수학I';
+    } else if (cleanedSubj.includes('수학II')) {
+      cleanedSubj = '수학II';
+    } else if (cleanedSubj.includes('국어') && gradeVal === 1) {
+      cleanedSubj = '국어';
+    } else if (cleanedSubj.includes('수학') && gradeVal === 1) {
+      cleanedSubj = '수학';
+    } else if (cleanedSubj.includes('영어') && gradeVal === 1) {
+      cleanedSubj = '영어';
+    }
+
+    // 동일한 학기 및 과목이 이미 존재하는지 체크하여 중복 방지 (성적 산출 무결성 보장)
+    const isDuplicate = gradesMap[stdId].some(
+      g => g.semester === semKey && g.subject === cleanedSubj
+    );
+
+    if (!isDuplicate) {
+      gradesMap[stdId].push({
+        semester: semKey,
+        subject: cleanedSubj,
+        unit: unitVal,
+        rank: rankVal
+      });
+    }
+  }
 
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -644,52 +731,101 @@ export function buildStudentsFromRaw(): Student[] {
     // 해시 기반 데이터 생성을 위한 시드
     const rng = seedRandom(id + name);
     
-    // 1대1 교과성적 및 전체 내신 등급(2.0 ~ 4.8 범위로 고정, 일부 우수 학생 1.1~1.9 부여)
-    const baseGpaSelector = rng();
-    let gpa = 2.0 + baseGpaSelector * 2.8; 
-    // 일부 고학번 우수생 특화
-    if (num <= 3) {
-      gpa = 1.1 + baseGpaSelector * 0.8;
-    } else if (num >= 25) {
-      gpa = 3.5 + baseGpaSelector * 1.4;
-    }
-    gpa = Math.round(gpa * 100) / 100;
+    // 1. 해당 학생의 CSV 성적 목록 추출
+    const existingGrades = gradesMap[id] || [];
+    const semestersWithData = new Set(existingGrades.map(g => g.semester));
 
-    // 학학기별 내신 성적 생성 (약간의 변동폭 제공)
+    // 2. 학생의 평소 학업 역량 평균 등급 산출 (기존 학기 데이터가 있을 경우 그것을 활용, 없을 경우 시드 기반 난수)
+    const realRanks = existingGrades.map(g => g.rank);
+    const avgRealRank = realRanks.length > 0 
+      ? realRanks.reduce((sum, r) => sum + r, 0) / realRanks.length 
+      : null;
+
+    const rngValueForGpa = seedRandom(id + name)();
+    const fallbackBaseGpa = 2.2 + rngValueForGpa * 2.8; // 2.2 ~ 5.0 등급 분포
+    const targetGpa = avgRealRank !== null ? avgRealRank : fallbackBaseGpa;
+
     const semesters = ['1-1', '1-2', '2-1', '2-2', '3-1'];
-    const semesterGpas: Record<string, number> = {};
-    semesters.forEach((sem, idx) => {
-      // 우상향 또는 우하향 성격 부여
-      const trend = (idx - 2) * (rng() - 0.5) * 0.3; // -0.3 ~ 0.3 변리
-      const semGpa = Math.min(9.0, Math.max(1.0, gpa + trend));
-      semesterGpas[sem] = Math.round(semGpa * 100) / 100;
-    });
-
-    // 개별 교과 성적(GradeItem) 복합 생성
     const grades: GradeItem[] = [];
-    const subjects = [
-      { name: '국어', units: [4, 4, 4, 4, 4] },
-      { name: '수학', units: [4, 4, 4, 4, 4] },
-      { name: '영어', units: [4, 4, 4, 4, 4] },
-      { name: '한국사', units: [2, 2, 2, 2, 1] },
-      { name: '사회교과', units: [3, 3, 4, 4, 3] },
-      { name: '과학교과', units: [3, 3, 4, 4, 3] },
-    ];
 
-    semesters.forEach(sem => {
-      subjects.forEach((subj, sIdx) => {
-        const semGpa = semesterGpas[sem];
-        const offset = (rng() - 0.5) * 1.5; // +/- 0.75
-        const itemGrade = Math.min(9, Math.max(1, Math.round(semGpa + offset)));
-        
-        grades.push({
-          semester: sem,
-          subject: subj.name,
-          unit: subj.units[semesters.indexOf(sem)],
-          rank: itemGrade
+    // 3. 5개 반영 학기 각각에 대해 데이터 구축
+    if (existingGrades.length > 0) {
+      // CSV 실 데이터가 존재하는 학생인 경우, 인위적인 성적 합성 없이 오직 실제 등급만 반영 (산출 무결성 확보)
+      grades.push(...existingGrades);
+    } else {
+      // CSV 데이터가 아예 없는 가상의 학생인 경우 (예: 6반), 전체 학기에 대해 시드 기반 모의 데이터 생성
+      semesters.forEach(sem => {
+        let semSubjects: { name: string; unit: number }[] = [];
+
+        if (sem === '1-1' || sem === '1-2') {
+          semSubjects = [
+            { name: '국어', unit: 3 },
+            { name: '수학', unit: 4 },
+            { name: '영어', unit: 4 },
+            { name: '한국사', unit: 3 },
+            { name: '통합사회', unit: 3 },
+            { name: '통합과학', unit: 3 },
+            { name: '한문I', unit: 2 }
+          ];
+        } else if (sem === '2-1') {
+          semSubjects = [
+            { name: '독서', unit: 4 },
+            { name: '수학I', unit: 4 },
+            { name: '확률과 통계', unit: 2 },
+            { name: '영어I', unit: 3 },
+            { name: '물리학I', unit: 4 },
+            { name: '화학I', unit: 4 },
+            { name: '일본어I', unit: 2 }
+          ];
+        } else if (sem === '2-2') {
+          semSubjects = [
+            { name: '문학', unit: 4 },
+            { name: '수학II', unit: 4 },
+            { name: '확률과 통계', unit: 2 },
+            { name: '영어II', unit: 3 },
+            { name: '생명과학I', unit: 4 },
+            { name: '지구과학I', unit: 4 },
+            { name: '일본어I', unit: 2 }
+          ];
+        } else if (sem === '3-1') {
+          semSubjects = [
+            { name: '화법과 작문', unit: 4 },
+            { name: '미적분', unit: 4 },
+            { name: '영어 독해와 작문', unit: 4 }
+          ];
+        }
+
+        semSubjects.forEach(subj => {
+          const sRng = seedRandom(id + name + sem + subj.name)();
+          const offset = (sRng - 0.5) * 1.5; // -0.75 ~ +0.75 변동
+          const itemGrade = Math.min(9, Math.max(1, Math.round(targetGpa + offset)));
+          grades.push({
+            semester: sem,
+            subject: subj.name,
+            unit: subj.unit,
+            rank: itemGrade
+          });
         });
       });
+    }
+
+    // [요구사항 1] 내신 평균 등급 계산 공식 구현: [(단위수 * 석차등급) 합산] / [단위수 합산]
+    const semesterGpas: Record<string, number> = {};
+    
+    semesters.forEach(sem => {
+      const semGrades = grades.filter(g => g.semester === sem);
+      const totalSemUnits = semGrades.reduce((sum, g) => sum + g.unit, 0);
+      const totalSemWeighted = semGrades.reduce((sum, g) => sum + g.rank * g.unit, 0);
+      semesterGpas[sem] = totalSemUnits > 0 
+        ? Math.round((totalSemWeighted / totalSemUnits) * 100) / 100 
+        : 5.0;
     });
+
+    const totalAllUnits = grades.reduce((sum, g) => sum + g.unit, 0);
+    const totalAllWeighted = grades.reduce((sum, g) => sum + g.rank * g.unit, 0);
+    const gpa = totalAllUnits > 0 
+      ? Math.round((totalAllWeighted / totalAllUnits) * 100) / 100 
+      : 5.0;
 
     // 모의고사 성적(3, 5, 6, 7, 9, 10월)
     const m3 = parsedMock3[id];

@@ -20,6 +20,7 @@ export interface CollegeStat {
   maxGpa2026?: string;
   avgGpa2026?: string;
   stdDev2026?: string;
+  cut50_2026?: string;
   cut70_2026: string;
   chuhapMin2026?: string;
   chuhapNo2026: string;
@@ -31,6 +32,7 @@ export interface CollegeStat {
   maxGpa2025?: string;
   avgGpa2025?: string;
   stdDev2025?: string;
+  cut50_2025?: string;
   cut70_2025: string;
   chuhapMin2025?: string;
   chuhapNo2025: string;
@@ -42,6 +44,7 @@ export interface CollegeStat {
   maxGpa2024?: string;
   avgGpa2024?: string;
   stdDev2024?: string;
+  cut50_2024?: string;
   cut70_2024: string;
   chuhapMin2024?: string;
   chuhapNo2024: string;
@@ -79,8 +82,9 @@ export async function fetchCollegeStats(): Promise<CollegeStat[]> {
         recruitCount2026: getVal(data2026.enrollment, ""),
         minGpa2026: "",
         maxGpa2026: "",
-        avgGpa2026: "",
+        avgGpa2026: getVal(data2026.average, ""),
         stdDev2026: "",
+        cut50_2026: getVal(data2026.cut50, ""),
         cut70_2026: getVal(data2026.cut70, ""),
         chuhapMin2026: "",
         chuhapNo2026: getVal(data2026.waitlistLastRank, ""),
@@ -90,8 +94,9 @@ export async function fetchCollegeStats(): Promise<CollegeStat[]> {
         recruitCount2025: getVal(data2025.enrollment, ""),
         minGpa2025: "",
         maxGpa2025: "",
-        avgGpa2025: "",
+        avgGpa2025: getVal(data2025.average, ""),
         stdDev2025: "",
+        cut50_2025: getVal(data2025.cut50, ""),
         cut70_2025: getVal(data2025.cut70, ""),
         chuhapMin2025: "",
         chuhapNo2025: getVal(data2025.waitlistLastRank, ""),
@@ -101,8 +106,9 @@ export async function fetchCollegeStats(): Promise<CollegeStat[]> {
         recruitCount2024: getVal(data2024.enrollment, ""),
         minGpa2024: "",
         maxGpa2024: "",
-        avgGpa2024: "",
+        avgGpa2024: getVal(data2024.average, ""),
         stdDev2024: "",
+        cut50_2024: getVal(data2024.cut50, ""),
         cut70_2024: getVal(data2024.cut70, ""),
         chuhapMin2024: "",
         chuhapNo2024: getVal(data2024.waitlistLastRank, ""),

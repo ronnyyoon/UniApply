@@ -28,6 +28,7 @@ interface YearlyData {
   maxGpa: string;
   avgGpa: string;
   stdDev: string;
+  cut50: string;
   cut70: string;
   chuhapMin: string;
   chuhapNo: string;
@@ -50,8 +51,8 @@ interface SimRow {
 }
 
 // Compact helper to generate year statistics
-function yData(rc: string, min: string, max: string, avg: string, sd: string, cut: string, chMin: string, chNo: string, rat: string): YearlyData {
-  return { recruitCount: rc, minGpa: min, maxGpa: max, avgGpa: avg, stdDev: sd, cut70: cut, chuhapMin: chMin, chuhapNo: chNo, ratio: rat };
+function yData(rc: string, min: string, max: string, avg: string, sd: string, cut50: string, cut: string, chMin: string, chNo: string, rat: string): YearlyData {
+  return { recruitCount: rc, minGpa: min, maxGpa: max, avgGpa: avg, stdDev: sd, cut50, cut70: cut, chuhapMin: chMin, chuhapNo: chNo, ratio: rat };
 }
 
 // Helper function to create default blank rows
@@ -66,9 +67,9 @@ const createDefaultRows = (studentGpa: string = ""): SimRow[] => {
     apply: 'O',
     recruitCount: '',
     studentGpa,
-    data2025: yData('', '', '', '', '', '', '', '', ''),
-    data2024: yData('', '', '', '', '', '', '', '', ''),
-    data2023: yData('', '', '', '', '', '', '', '', '')
+    data2025: yData('', '', '', '', '', '', '', '', '', ''),
+    data2024: yData('', '', '', '', '', '', '', '', '', ''),
+    data2023: yData('', '', '', '', '', '', '', '', '', '')
   }));
 };
 
@@ -124,6 +125,82 @@ function calculateGpaLocation(studentGpaStr: string, avgGpaStr: string, stdDevSt
   return '상위';
 }
 
+interface PositionResult {
+  label: string;
+  bgClass: string;
+  textClass: string;
+}
+
+export function calculateMyPosition(
+  type: string,
+  studentGpaStr: string,
+  maxStr: string,
+  avgStr: string,
+  cutStr: string,
+  minStr: string
+): PositionResult {
+  const s = parseFloat(studentGpaStr);
+  if (isNaN(s)) return { label: '-', bgClass: 'bg-slate-100', textClass: 'text-slate-500' };
+
+  const max = parseFloat(maxStr);
+  const avg = parseFloat(avgStr);
+  const cut = parseFloat(cutStr);
+  const min = parseFloat(minStr);
+
+  const hasMax = !isNaN(max);
+  const hasAvg = !isNaN(avg);
+  const hasCut = !isNaN(cut);
+  const hasMin = !isNaN(min);
+
+  // If no average/stats populated yet
+  if (!hasAvg) return { label: '-', bgClass: 'bg-slate-100', textClass: 'text-slate-500' };
+
+  const COLORS = {
+    '하향': { label: '하향', bgClass: 'bg-blue-100 border border-blue-200', textClass: 'text-blue-700 font-extrabold' },
+    '안전': { label: '안전', bgClass: 'bg-emerald-100 border border-emerald-200', textClass: 'text-emerald-700 font-extrabold' },
+    '소신': { label: '소신', bgClass: 'bg-amber-100 border border-amber-200', textClass: 'text-amber-700 font-extrabold' },
+    '상향': { label: '상향', bgClass: 'bg-orange-100 border border-orange-200', textClass: 'text-orange-700 font-extrabold' },
+    '과상': { label: '과상', bgClass: 'bg-red-100 border border-red-200', textClass: 'text-red-700 font-extrabold' },
+  };
+
+  if (type === '학생부교과') {
+    // 최고성적 이상일 경우 '하향'
+    if (hasMax && s <= max) return COLORS['하향'];
+    // 최고성적보다 낮고, 평균 이상일 경우 '안전'
+    if (hasMax && s > max && s <= avg) return COLORS['안전'];
+    if (!hasMax && s <= avg) return COLORS['안전'];
+    
+    // 평균보다 낮고, 70% 이상일 경우 '소신'
+    if (hasCut && s > avg && s <= cut) return COLORS['소신'];
+    if (!hasCut && hasMin && s > avg && s <= min) return COLORS['소신'];
+
+    // 70%보다 낮고, 최저 이상일 경우 '상향'
+    if (hasCut && hasMin && s > cut && s <= min) return COLORS['상향'];
+    if (!hasCut && hasMin && s <= min) return COLORS['상향'];
+
+    // 최저보다 낮을 경우 '과상'
+    if (hasMin && s > min) return COLORS['과상'];
+    if (!hasMin && hasCut && s > cut) return COLORS['과상'];
+    
+    return COLORS['소신'];
+  } else {
+    // 최고성적 이상일 경우 '안전'
+    if (hasMax && s <= max) return COLORS['안전'];
+    // 최고성적보다 낮고, 평균 이상일 경우 '소신'
+    if (hasMax && s > max && s <= avg) return COLORS['소신'];
+    if (!hasMax && s <= avg) return COLORS['소신'];
+
+    // 평균보다 낮고, 70% 이상일 경우 '상향'
+    if (hasCut && s > avg && s <= cut) return COLORS['상향'];
+    if (!hasCut && s > avg) return COLORS['상향'];
+
+    // 70%보다 낮을 경우 '과상'
+    if (hasCut && s > cut) return COLORS['과상'];
+    
+    return COLORS['소신'];
+  }
+}
+
 // Rule 7: Analytical bounds calculations
 function calculateAnalysis(
   type: string, 
@@ -132,52 +209,9 @@ function calculateAnalysis(
   avgStr: string, 
   minStr: string, 
   cutStr: string, 
-  chuhapMinStr: string
+  chuhapMinStr?: string
 ): string {
-  const s = parseFloat(studentGpaStr);
-  if (isNaN(s)) return '-';
-
-  const max = parseFloat(maxStr);
-  const avg = parseFloat(avgStr);
-  const min = parseFloat(minStr);
-  const cut = parseFloat(cutStr);
-  const chuhapMin = parseFloat(chuhapMinStr);
-
-  const hasMax = !isNaN(max);
-  const hasAvg = !isNaN(avg);
-  const hasMin = !isNaN(min);
-  const hasCut = !isNaN(cut);
-  const hasChuhap = !isNaN(chuhapMin);
-
-  if (type === '학생부교과') {
-    if (hasMax && s < max) return '과하';
-    if (hasMax && hasAvg && s >= max && s < avg) return '하향';
-    if (hasAvg && hasMin && s >= avg && s < min) return '안전';
-    if (hasMin && hasCut && s >= Math.min(min, cut) && s < Math.max(min, cut)) return '소신';
-    if (hasCut && hasChuhap && s >= Math.min(cut, chuhapMin) && s < Math.max(cut, chuhapMin)) return '상향';
-    if (hasChuhap && s >= chuhapMin) return '과상';
-
-    // Fallbacks
-    if (hasAvg) {
-      if (s < avg) return '하향';
-      if (hasCut && s >= cut) return '상향';
-      if (hasMin && s >= min) return '소신';
-      return '소신';
-    }
-  } else {
-    // 학생부종합, 논술전형, 면접전형, 실기전형
-    if (hasMax && s < max) return '안전';
-    if (hasMax && hasAvg && s >= max && s < avg) return '소신';
-    if (hasAvg && hasMin && s >= avg && s < min) return '상향';
-    if (hasMin && s >= min) return '과상';
-
-    // Fallbacks
-    if (hasAvg) {
-      if (s < avg) return '소신';
-      return '상향';
-    }
-  }
-  return '-';
+  return calculateMyPosition(type, studentGpaStr, maxStr, avgStr, cutStr, minStr).label;
 }
 
 const REGIONS = [
@@ -317,6 +351,7 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
             match.maxGpa2026 || '',
             match.avgGpa2026 || '',
             match.stdDev2026 || '',
+            match.cut50_2026 || '',
             match.cut70_2026 || '',
             match.chuhapMin2026 || '',
             match.chuhapNo2026 || '',
@@ -328,6 +363,7 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
             match.maxGpa2025 || '',
             match.avgGpa2025 || '',
             match.stdDev2025 || '',
+            match.cut50_2025 || '',
             match.cut70_2025 || '',
             match.chuhapMin2025 || '',
             match.chuhapNo2025 || '',
@@ -339,6 +375,7 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
             match.maxGpa2024 || '',
             match.avgGpa2024 || '',
             match.stdDev2024 || '',
+            match.cut50_2024 || '',
             match.cut70_2024 || '',
             match.chuhapMin2024 || '',
             match.chuhapNo2024 || '',
@@ -360,6 +397,7 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
 
   // State for the White-themed overlay showing 3-year statistical trends
   const [activeOverlayData, setActiveOverlayData] = useState<{
+    rowId: string;
     college: string;
     major: string;
     type: string;
@@ -458,17 +496,13 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
       );
     });
 
-    if (!match) {
-      alert("일치하는 자료가 없습니다.");
-      return;
-    }
-
-    const statsObj = match.stats || {};
+    const statsObj = match ? (match.stats || {}) : {};
     const stats2024 = statsObj['2024'] || {};
     const stats2025 = statsObj['2025'] || {};
     const stats2026 = statsObj['2026'] || {};
 
     setActiveOverlayData({
+      rowId: row.id,
       college: row.college,
       major: row.major,
       type: row.type,
@@ -494,6 +528,23 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
       ...prev,
       [student.id]: newSheet
     }));
+  };
+
+  const handleModalValueChange = (year: '2023' | '2024' | '2025', field: keyof YearlyData, value: string) => {
+    if (!activeOverlayData) return;
+    const targetYearKey = year === '2023' ? 'data2023' : year === '2024' ? 'data2024' : 'data2025';
+    
+    const updatedSheet = currentSheet.map(row => {
+      if (row.id !== activeOverlayData.rowId) return row;
+      return {
+        ...row,
+        [targetYearKey]: {
+          ...row[targetYearKey],
+          [field]: value
+        }
+      };
+    });
+    updateCurrentSheet(updatedSheet);
   };
 
   const handleCellChange = (rowId: string, path: string[], value: any) => {
@@ -524,9 +575,9 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
       apply: 'O',
       recruitCount: '',
       studentGpa: student.gpa.toString(),
-      data2025: yData('', '', '', '', '', '', '', '', ''),
-      data2024: yData('', '', '', '', '', '', '', '', ''),
-      data2023: yData('', '', '', '', '', '', '', '', '')
+      data2025: yData('', '', '', '', '', '', '', '', '', ''),
+      data2024: yData('', '', '', '', '', '', '', '', '', ''),
+      data2023: yData('', '', '', '', '', '', '', '', '', '')
     };
     updateCurrentSheet([...currentSheet, newRow]);
   };
@@ -666,6 +717,15 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
     <div id="print-section" className="p-4 space-y-5 overflow-y-auto max-h-[calc(100vh-4rem)] print:max-h-none print:overflow-visible print:p-0 print:m-0 animate-fade-in text-white text-[12px]">
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
+          html, body, #app-root-container, #app-root-container div, main, #print-section {
+            overflow: visible !important;
+            height: auto !important;
+            max-height: none !important;
+            min-height: 0 !important;
+            flex: none !important;
+            display: block !important;
+            position: static !important;
+          }
           body {
             background-color: #0b0b0c !important;
             color: white !important;
@@ -678,9 +738,9 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
             display: none !important;
           }
           #print-section {
-            position: absolute;
-            left: 0;
-            top: 0;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
             width: 100% !important;
             max-height: none !important;
             overflow: visible !important;
@@ -919,149 +979,359 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
 
           {/* White-themed elegant statistical overlay */}
           {activeOverlayData && (
-            <div className="absolute inset-0 bg-white z-20 flex flex-col p-4 md:p-5 text-slate-800 animate-in fade-in zoom-in-95 duration-200 overflow-y-auto">
-              <div className="flex flex-col h-full space-y-4">
-                <div>
-                  {/* Overlay Title & Close Button */}
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-200 mb-3 shrink-0">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 inline-block animate-pulse"></span>
-                      <h3 className="text-xs md:text-sm font-black text-slate-900 tracking-wider">
-                        3개년 대학 입시 통계 상세자료
-                      </h3>
+            <div className="absolute inset-0 bg-white z-20 flex flex-col p-3 md:p-4 text-slate-800 animate-in fade-in zoom-in-95 duration-200 overflow-y-auto">
+              <div className="flex flex-col h-full space-y-2.5">
+                {(() => {
+                  const targetRow = processedRows.find(r => r.id === activeOverlayData.rowId);
+                  if (!targetRow) return <div className="text-slate-500 font-bold p-4">데이터를 찾을 수 없습니다.</div>;
+
+                  const pos24 = calculateMyPosition(targetRow.type, targetRow.studentGpa, targetRow.data2023.maxGpa, targetRow.data2023.avgGpa, targetRow.data2023.cut70, targetRow.data2023.minGpa);
+                  const pos25 = calculateMyPosition(targetRow.type, targetRow.studentGpa, targetRow.data2024.maxGpa, targetRow.data2024.avgGpa, targetRow.data2024.cut70, targetRow.data2024.minGpa);
+                  const pos26 = calculateMyPosition(targetRow.type, targetRow.studentGpa, targetRow.data2025.maxGpa, targetRow.data2025.avgGpa, targetRow.data2025.cut70, targetRow.data2025.minGpa);
+
+                  return (
+                    <div>
+                      {/* Overlay Title & Close Button */}
+                      <div className="flex items-center justify-between pb-1.5 border-b border-slate-200 mb-2.5 shrink-0">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-indigo-600 inline-block animate-pulse"></span>
+                          <h3 className="text-[11px] md:text-xs font-black text-slate-900 tracking-wider">
+                            3개년 대학 입시 통계 상세자료 (사용자 직접 수정 가능)
+                          </h3>
+                        </div>
+                        <button 
+                          onClick={() => setActiveOverlayData(null)}
+                          className="px-2 py-1 text-[11px] font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors cursor-pointer select-none"
+                        >
+                          닫기 (X)
+                        </button>
+                      </div>
+
+                      {/* Header Details Table - Reorganized to show Student Grade below Student Grade label */}
+                      <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50 mb-2.5 shadow-sm text-[11px] md:text-xs">
+                        <table className="w-full text-center border-collapse">
+                          <thead>
+                            <tr className="bg-slate-100 text-slate-600 border-b border-slate-200 font-extrabold text-[10px] md:text-[11px]">
+                              <th className="w-[20%] py-1 border-r border-slate-200 select-none">대학</th>
+                              <th className="w-[20%] py-1 border-r border-slate-200 select-none">모집단위</th>
+                              <th className="w-[20%] py-1 border-r border-slate-200 select-none">전형유형</th>
+                              <th className="w-[25%] py-1 border-r border-slate-200 select-none">세부전형</th>
+                              <th className="w-[15%] py-1 bg-amber-100 text-amber-800 font-black select-none">학생 성적</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="font-bold text-slate-900 bg-white">
+                              <td className="py-1.5 border-r border-slate-200 px-2 text-center font-black">{activeOverlayData.college}</td>
+                              <td className="py-1.5 border-r border-slate-200 px-2 text-center font-black">{activeOverlayData.major}</td>
+                              <td className="py-1.5 border-r border-slate-200 px-2 text-center text-indigo-600 text-[11px]">{activeOverlayData.type}</td>
+                              <td className="py-1.5 border-r border-slate-200 px-2 text-center text-slate-700 text-[11px]">{activeOverlayData.detailType}</td>
+                              <td className="py-1.5 text-center px-2 font-mono font-extrabold text-amber-600 bg-amber-50/50">
+                                {targetRow.studentGpa || '-'}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Trend Table */}
+                      <div className="overflow-hidden rounded-lg border border-slate-200 shadow-sm text-[11px] md:text-xs">
+                        <table className="w-full text-center border-collapse">
+                          <thead>
+                            <tr className="bg-slate-100 text-slate-700 font-extrabold border-b border-slate-200 text-[10px] md:text-[11px]">
+                              <th className="py-1 px-1 border-r border-slate-200 w-[20%]">구분</th>
+                              <th className="py-1 px-1 border-r border-slate-200 w-[20%]">2024학년도</th>
+                              <th className="py-1 px-1 border-r border-slate-200 w-[20%]">2025학년도</th>
+                              <th className="py-1 px-1 border-r border-slate-200 w-[20%]">2026학년도</th>
+                              <th className="py-1 px-1 w-[20%]">3개년 추이</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200 font-semibold text-[11px]">
+                            {/* 1. 모집인원 */}
+                            <tr>
+                              <td className="py-1 px-1 bg-slate-50 font-bold border-r border-slate-200 text-slate-700">모집인원</td>
+                              <td className="py-0.5 px-1 border-r border-slate-200">
+                                <input
+                                  type="text"
+                                  value={targetRow.data2023.recruitCount}
+                                  onChange={(e) => handleModalValueChange('2023', 'recruitCount', e.target.value)}
+                                  className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
+                                />
+                              </td>
+                              <td className="py-0.5 px-1 border-r border-slate-200">
+                                <input
+                                  type="text"
+                                  value={targetRow.data2024.recruitCount}
+                                  onChange={(e) => handleModalValueChange('2024', 'recruitCount', e.target.value)}
+                                  className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
+                                />
+                              </td>
+                              <td className="py-0.5 px-1 border-r border-slate-200">
+                                <input
+                                  type="text"
+                                  value={targetRow.data2025.recruitCount}
+                                  onChange={(e) => handleModalValueChange('2025', 'recruitCount', e.target.value)}
+                                  className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
+                                />
+                              </td>
+                              <td className="py-1 px-1 font-bold text-[10px] md:text-[11px]">
+                                {(() => {
+                                  const trend = getTrend(targetRow.data2023.recruitCount, targetRow.data2024.recruitCount, targetRow.data2025.recruitCount, 'recruit');
+                                  return trend.text ? <span className={trend.className}>{trend.text}</span> : <span className="text-slate-400">-</span>;
+                                })()}
+                              </td>
+                            </tr>
+                            {/* 2. 경쟁률 */}
+                            <tr>
+                              <td className="py-1 px-1 bg-slate-50 font-bold border-r border-slate-200 text-slate-700">경쟁률</td>
+                              <td className="py-0.5 px-1 border-r border-slate-200">
+                                <input
+                                  type="text"
+                                  value={targetRow.data2023.ratio}
+                                  onChange={(e) => handleModalValueChange('2023', 'ratio', e.target.value)}
+                                  className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
+                                />
+                              </td>
+                              <td className="py-0.5 px-1 border-r border-slate-200">
+                                <input
+                                  type="text"
+                                  value={targetRow.data2024.ratio}
+                                  onChange={(e) => handleModalValueChange('2024', 'ratio', e.target.value)}
+                                  className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
+                                />
+                              </td>
+                              <td className="py-0.5 px-1 border-r border-slate-200">
+                                <input
+                                  type="text"
+                                  value={targetRow.data2025.ratio}
+                                  onChange={(e) => handleModalValueChange('2025', 'ratio', e.target.value)}
+                                  className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
+                                />
+                              </td>
+                              <td className="py-1 px-1 font-bold text-[10px] md:text-[11px]">
+                                {(() => {
+                                  const trend = getTrend(targetRow.data2023.ratio, targetRow.data2024.ratio, targetRow.data2025.ratio, 'ratio');
+                                  return trend.text ? <span className={trend.className}>{trend.text}</span> : <span className="text-slate-400">-</span>;
+                                })()}
+                              </td>
+                            </tr>
+                            {/* 3. 최고 */}
+                            <tr>
+                              <td className="py-1 px-1 bg-slate-50 font-extrabold border-r border-slate-200 text-slate-700">최고</td>
+                              <td className="py-0.5 px-1 border-r border-slate-200">
+                                <input
+                                  type="text"
+                                  value={targetRow.data2023.maxGpa}
+                                  onChange={(e) => handleModalValueChange('2023', 'maxGpa', e.target.value)}
+                                  className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
+                                />
+                              </td>
+                              <td className="py-0.5 px-1 border-r border-slate-200">
+                                <input
+                                  type="text"
+                                  value={targetRow.data2024.maxGpa}
+                                  onChange={(e) => handleModalValueChange('2024', 'maxGpa', e.target.value)}
+                                  className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
+                                />
+                              </td>
+                              <td className="py-0.5 px-1 border-r border-slate-200">
+                                <input
+                                  type="text"
+                                  value={targetRow.data2025.maxGpa}
+                                  onChange={(e) => handleModalValueChange('2025', 'maxGpa', e.target.value)}
+                                  className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
+                                />
+                              </td>
+                              <td className="py-1 px-1 font-bold text-[10px] md:text-[11px]">
+                                {(() => {
+                                  const trend = getTrend(targetRow.data2023.maxGpa, targetRow.data2024.maxGpa, targetRow.data2025.maxGpa, 'score');
+                                  return trend.text ? <span className={trend.className}>{trend.text}</span> : <span className="text-slate-400">-</span>;
+                                })()}
+                              </td>
+                            </tr>
+                            {/* 4. 평균 */}
+                            <tr>
+                              <td className="py-1 px-1 bg-slate-50 font-bold border-r border-slate-200 text-slate-700">평균</td>
+                              <td className="py-0.5 px-1 border-r border-slate-200">
+                                <input
+                                  type="text"
+                                  value={targetRow.data2023.avgGpa}
+                                  onChange={(e) => handleModalValueChange('2023', 'avgGpa', e.target.value)}
+                                  className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
+                                />
+                              </td>
+                              <td className="py-0.5 px-1 border-r border-slate-200">
+                                <input
+                                  type="text"
+                                  value={targetRow.data2024.avgGpa}
+                                  onChange={(e) => handleModalValueChange('2024', 'avgGpa', e.target.value)}
+                                  className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
+                                />
+                              </td>
+                              <td className="py-0.5 px-1 border-r border-slate-200">
+                                <input
+                                  type="text"
+                                  value={targetRow.data2025.avgGpa}
+                                  onChange={(e) => handleModalValueChange('2025', 'avgGpa', e.target.value)}
+                                  className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
+                                />
+                              </td>
+                              <td className="py-1 px-1 font-bold text-[10px] md:text-[11px]">
+                                {(() => {
+                                  const trend = getTrend(targetRow.data2023.avgGpa, targetRow.data2024.avgGpa, targetRow.data2025.avgGpa, 'score');
+                                  return trend.text ? <span className={trend.className}>{trend.text}</span> : <span className="text-slate-400">-</span>;
+                                })()}
+                              </td>
+                            </tr>
+                            {/* 5. 70% CUT */}
+                            <tr>
+                              <td className="py-1 px-1 bg-slate-50 font-bold border-r border-slate-200 text-slate-700">70% CUT</td>
+                              <td className="py-0.5 px-1 border-r border-slate-200">
+                                <input
+                                  type="text"
+                                  value={targetRow.data2023.cut70}
+                                  onChange={(e) => handleModalValueChange('2023', 'cut70', e.target.value)}
+                                  className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
+                                />
+                              </td>
+                              <td className="py-0.5 px-1 border-r border-slate-200">
+                                <input
+                                  type="text"
+                                  value={targetRow.data2024.cut70}
+                                  onChange={(e) => handleModalValueChange('2024', 'cut70', e.target.value)}
+                                  className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
+                                />
+                              </td>
+                              <td className="py-0.5 px-1 border-r border-slate-200">
+                                <input
+                                  type="text"
+                                  value={targetRow.data2025.cut70}
+                                  onChange={(e) => handleModalValueChange('2025', 'cut70', e.target.value)}
+                                  className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
+                                />
+                              </td>
+                              <td className="py-1 px-1 font-bold text-[10px] md:text-[11px]">
+                                {(() => {
+                                  const trend = getTrend(targetRow.data2023.cut70, targetRow.data2024.cut70, targetRow.data2025.cut70, 'score');
+                                  return trend.text ? <span className={trend.className}>{trend.text}</span> : <span className="text-slate-400">-</span>;
+                                })()}
+                              </td>
+                            </tr>
+                            {/* 6. 최저 */}
+                            <tr>
+                              <td className="py-1 px-1 bg-slate-50 font-extrabold border-r border-slate-200 text-slate-700">최저</td>
+                              <td className="py-0.5 px-1 border-r border-slate-200">
+                                <input
+                                  type="text"
+                                  value={targetRow.data2023.minGpa}
+                                  onChange={(e) => handleModalValueChange('2023', 'minGpa', e.target.value)}
+                                  className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
+                                />
+                              </td>
+                              <td className="py-0.5 px-1 border-r border-slate-200">
+                                <input
+                                  type="text"
+                                  value={targetRow.data2024.minGpa}
+                                  onChange={(e) => handleModalValueChange('2024', 'minGpa', e.target.value)}
+                                  className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
+                                />
+                              </td>
+                              <td className="py-0.5 px-1 border-r border-slate-200">
+                                <input
+                                  type="text"
+                                  value={targetRow.data2025.minGpa}
+                                  onChange={(e) => handleModalValueChange('2025', 'minGpa', e.target.value)}
+                                  className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
+                                />
+                              </td>
+                              <td className="py-1 px-1 font-bold text-[10px] md:text-[11px]">
+                                {(() => {
+                                  const trend = getTrend(targetRow.data2023.minGpa, targetRow.data2024.minGpa, targetRow.data2025.minGpa, 'score');
+                                  return trend.text ? <span className={trend.className}>{trend.text}</span> : <span className="text-slate-400">-</span>;
+                                })()}
+                              </td>
+                            </tr>
+                            {/* 7. 충원인원 */}
+                            <tr>
+                              <td className="py-1 px-1 bg-slate-50 font-bold border-r border-slate-200 text-slate-700">충원인원</td>
+                              <td className="py-0.5 px-1 border-r border-slate-200">
+                                <input
+                                  type="text"
+                                  value={targetRow.data2023.chuhapNo}
+                                  onChange={(e) => handleModalValueChange('2023', 'chuhapNo', e.target.value)}
+                                  className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
+                                />
+                              </td>
+                              <td className="py-0.5 px-1 border-r border-slate-200">
+                                <input
+                                  type="text"
+                                  value={targetRow.data2024.chuhapNo}
+                                  onChange={(e) => handleModalValueChange('2024', 'chuhapNo', e.target.value)}
+                                  className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
+                                />
+                              </td>
+                              <td className="py-0.5 px-1 border-r border-slate-200">
+                                <input
+                                  type="text"
+                                  value={targetRow.data2025.chuhapNo}
+                                  onChange={(e) => handleModalValueChange('2025', 'chuhapNo', e.target.value)}
+                                  className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
+                                />
+                              </td>
+                              <td className="py-1 px-1 font-bold text-[10px] md:text-[11px]">
+                                {(() => {
+                                  const trend = getTrend(targetRow.data2023.chuhapNo, targetRow.data2024.chuhapNo, targetRow.data2025.chuhapNo, 'recruit');
+                                  return trend.text ? <span className={trend.className}>{trend.text}</span> : <span className="text-slate-400">-</span>;
+                                })()}
+                              </td>
+                            </tr>
+                            {/* 8. 내 위치 (2-line layout requested) */}
+                            <tr className="bg-slate-50/60">
+                              <td className="py-1 px-1 bg-slate-100 font-extrabold border-r border-slate-200 text-indigo-900 select-none leading-tight text-[10px] md:text-[11px]">
+                                내 위치<br />(최종등록자 기준)
+                              </td>
+                              <td className="py-1 px-1 border-r border-slate-200 text-center">
+                                {pos24.label !== '-' ? (
+                                  <span className={`px-1.5 py-0.5 rounded text-[10px] ${pos24.bgClass} ${pos24.textClass}`}>
+                                    {pos24.label}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400">-</span>
+                                )}
+                              </td>
+                              <td className="py-1 px-1 border-r border-slate-200 text-center">
+                                {pos25.label !== '-' ? (
+                                  <span className={`px-1.5 py-0.5 rounded text-[10px] ${pos25.bgClass} ${pos25.textClass}`}>
+                                    {pos25.label}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400">-</span>
+                                )}
+                              </td>
+                              <td className="py-1 px-1 border-r border-slate-200 text-center">
+                                {pos26.label !== '-' ? (
+                                  <span className={`px-1.5 py-0.5 rounded text-[10px] ${pos26.bgClass} ${pos26.textClass}`}>
+                                    {pos26.label}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400">-</span>
+                                )}
+                              </td>
+                              <td className="py-1 px-1 text-center font-bold text-[10px] md:text-[11px] text-indigo-700">
+                                {pos24.label !== '-' && pos25.label !== '-' && pos26.label !== '-' ? (
+                                  <span className="bg-indigo-50 border border-indigo-100 px-1 py-0.5 rounded text-[10px] whitespace-nowrap">
+                                    {pos24.label} → {pos25.label} → {pos26.label}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400">-</span>
+                                )}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
-                    <button 
-                      onClick={() => setActiveOverlayData(null)}
-                      className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors cursor-pointer select-none"
-                    >
-                      닫기 (X)
-                    </button>
-                  </div>
-
-                  {/* Header Details Table */}
-                  <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50 mb-4 shadow-sm text-xs md:text-[13px]">
-                    <table className="w-full text-center border-collapse">
-                      <tbody>
-                        <tr className="border-b border-slate-200">
-                          <td className="w-[15%] bg-slate-100 font-extrabold text-slate-600 py-2 border-r border-slate-200 select-none">대학</td>
-                          <td className="w-[35%] py-2 border-r border-slate-200 text-left px-3 font-black text-slate-900">{activeOverlayData.college}</td>
-                          <td className="w-[15%] bg-slate-100 font-extrabold text-slate-600 py-2 border-r border-slate-200 select-none">모집단위</td>
-                          <td className="w-[35%] py-2 text-left px-3 font-black text-slate-900">{activeOverlayData.major}</td>
-                        </tr>
-                        <tr>
-                          <td className="bg-slate-100 font-extrabold text-slate-600 py-2 border-r border-slate-200 select-none">전형유형</td>
-                          <td className="py-2 border-r border-slate-200 text-left px-3 font-bold text-amber-600">{activeOverlayData.type}</td>
-                          <td className="bg-slate-100 font-extrabold text-slate-600 py-2 border-r border-slate-200 select-none">세부전형</td>
-                          <td className="py-2 text-left px-3 font-bold text-slate-700">{activeOverlayData.detailType}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Trend Table */}
-                  <div className="overflow-hidden rounded-lg border border-slate-200 shadow-sm text-xs md:text-[13px]">
-                    <table className="w-full text-center border-collapse">
-                      <thead>
-                        <tr className="bg-slate-100 text-slate-700 font-extrabold border-b border-slate-200">
-                          <th className="py-2 px-1.5 border-r border-slate-200 w-[20%]">구분</th>
-                          <th className="py-2 px-1.5 border-r border-slate-200 w-[20%]">2024학년도</th>
-                          <th className="py-2 px-1.5 border-r border-slate-200 w-[20%]">2025학년도</th>
-                          <th className="py-2 px-1.5 border-r border-slate-200 w-[20%]">2026학년도</th>
-                          <th className="py-2 px-1.5 w-[20%]">3개년 추이</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200 font-semibold">
-                        {/* 1. 모집인원 */}
-                        <tr>
-                          <td className="py-2 px-1.5 bg-slate-50 font-bold border-r border-slate-200 text-slate-700">모집인원</td>
-                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2024.enrollment ? `${activeOverlayData.stats2024.enrollment}명` : '-'}</td>
-                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2025.enrollment ? `${activeOverlayData.stats2025.enrollment}명` : '-'}</td>
-                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2026.enrollment ? `${activeOverlayData.stats2026.enrollment}명` : '-'}</td>
-                          <td className="py-2 px-1.5 font-bold">
-                            {(() => {
-                              const trend = getTrend(activeOverlayData.stats2024.enrollment, activeOverlayData.stats2025.enrollment, activeOverlayData.stats2026.enrollment, 'recruit');
-                              return trend.text ? <span className={trend.className}>{trend.text}</span> : <span className="text-slate-400">-</span>;
-                            })()}
-                          </td>
-                        </tr>
-                        {/* 2. 경쟁률 */}
-                        <tr>
-                          <td className="py-2 px-1.5 bg-slate-50 font-bold border-r border-slate-200 text-slate-700">경쟁률</td>
-                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2024.competitionRate ? `${activeOverlayData.stats2024.competitionRate}:1` : '-'}</td>
-                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2025.competitionRate ? `${activeOverlayData.stats2025.competitionRate}:1` : '-'}</td>
-                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2026.competitionRate ? `${activeOverlayData.stats2026.competitionRate}:1` : '-'}</td>
-                          <td className="py-2 px-1.5 font-bold">
-                            {(() => {
-                              const trend = getTrend(activeOverlayData.stats2024.competitionRate, activeOverlayData.stats2025.competitionRate, activeOverlayData.stats2026.competitionRate, 'ratio');
-                              return trend.text ? <span className={trend.className}>{trend.text}</span> : <span className="text-slate-400">-</span>;
-                            })()}
-                          </td>
-                        </tr>
-                        {/* 3. 평균 */}
-                        <tr>
-                          <td className="py-2 px-1.5 bg-slate-50 font-bold border-r border-slate-200 text-slate-700">평균</td>
-                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2024.average || '-'}</td>
-                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2025.average || '-'}</td>
-                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2026.average || '-'}</td>
-                          <td className="py-2 px-1.5 font-bold">
-                            {(() => {
-                              const trend = getTrend(activeOverlayData.stats2024.average, activeOverlayData.stats2025.average, activeOverlayData.stats2026.average, 'score');
-                              return trend.text ? <span className={trend.className}>{trend.text}</span> : <span className="text-slate-400">-</span>;
-                            })()}
-                          </td>
-                        </tr>
-                        {/* 4. 50% CUT */}
-                        <tr>
-                          <td className="py-2 px-1.5 bg-slate-50 font-bold border-r border-slate-200 text-slate-700">50% CUT</td>
-                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2024.cut50 || '-'}</td>
-                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2025.cut50 || '-'}</td>
-                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2026.cut50 || '-'}</td>
-                          <td className="py-2 px-1.5 font-bold">
-                            {(() => {
-                              const trend = getTrend(activeOverlayData.stats2024.cut50, activeOverlayData.stats2025.cut50, activeOverlayData.stats2026.cut50, 'score');
-                              return trend.text ? <span className={trend.className}>{trend.text}</span> : <span className="text-slate-400">-</span>;
-                            })()}
-                          </td>
-                        </tr>
-                        {/* 5. 70% CUT */}
-                        <tr>
-                          <td className="py-2 px-1.5 bg-slate-50 font-bold border-r border-slate-200 text-slate-700">70% CUT</td>
-                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2024.cut70 || '-'}</td>
-                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2025.cut70 || '-'}</td>
-                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">{activeOverlayData.stats2026.cut70 || '-'}</td>
-                          <td className="py-2 px-1.5 font-bold">
-                            {(() => {
-                              const trend = getTrend(activeOverlayData.stats2024.cut70, activeOverlayData.stats2025.cut70, activeOverlayData.stats2026.cut70, 'score');
-                              return trend.text ? <span className={trend.className}>{trend.text}</span> : <span className="text-slate-400">-</span>;
-                            })()}
-                          </td>
-                        </tr>
-                        {/* 6. 충원인원 */}
-                        <tr>
-                          <td className="py-2 px-1.5 bg-slate-50 font-bold border-r border-slate-200 text-slate-700">충원인원</td>
-                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">
-                            {formatWaitlist(activeOverlayData.stats2024.enrollment, activeOverlayData.stats2024.waitlistLastRank)}
-                          </td>
-                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">
-                            {formatWaitlist(activeOverlayData.stats2025.enrollment, activeOverlayData.stats2025.waitlistLastRank)}
-                          </td>
-                          <td className="py-2 px-1.5 border-r border-slate-200 font-mono text-slate-900">
-                            {formatWaitlist(activeOverlayData.stats2026.enrollment, activeOverlayData.stats2026.waitlistLastRank)}
-                          </td>
-                          <td className="py-2 px-1.5 font-bold">
-                            {(() => {
-                              const pct24 = getWaitlistPct(activeOverlayData.stats2024.enrollment, activeOverlayData.stats2024.waitlistLastRank);
-                              const pct25 = getWaitlistPct(activeOverlayData.stats2025.enrollment, activeOverlayData.stats2025.waitlistLastRank);
-                              const pct26 = getWaitlistPct(activeOverlayData.stats2026.enrollment, activeOverlayData.stats2026.waitlistLastRank);
-                              const trend = getTrend(pct24, pct25, pct26, 'waitlist');
-                              return trend.text ? <span className={trend.className}>{trend.text}</span> : <span className="text-slate-400">-</span>;
-                            })()}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
             </div>
           )}
@@ -1195,21 +1465,21 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
             {/* Header Tier 1: Group Ranges */}
             <thead>
               <tr className="bg-zinc-950 select-none border-b professional-border">
-                <th colSpan={8} className="py-2 px-3 border border-zinc-800/80 font-extrabold text-[#D4AF37] text-left uppercase bg-[#18181B]">
+                <th colSpan={8} className="py-2 px-3 border border-zinc-800/80 border-r-4 border-r-zinc-500 font-extrabold text-[#D4AF37] text-left uppercase bg-[#18181B]">
                   희망 지원 대학 및 유형
                 </th>
-                <th colSpan={3} className="py-2 px-3 border border-zinc-800/80 text-center font-extrabold text-blue-400 bg-zinc-900">
+                <th colSpan={3} className="py-2 px-3 border border-zinc-800/80 border-r-4 border-r-zinc-500 text-center font-extrabold text-blue-400 bg-zinc-900">
                   연도별 대비 분석 결과
                 </th>
                 
                 {show2025 && (
-                  <th colSpan={11} className="py-2 px-3 border border-zinc-800/80 text-center font-black bg-emerald-950 text-emerald-400">
+                  <th colSpan={11} className="py-2 px-3 border border-zinc-800/80 border-r-4 border-r-zinc-500 text-center font-black bg-emerald-950 text-emerald-400">
                     2026학년도 기준 성적
                   </th>
                 )}
                 
                 {show2024 && (
-                  <th colSpan={11} className="py-2 px-3 border border-zinc-800/80 text-center font-black bg-amber-950 text-amber-400">
+                  <th colSpan={11} className="py-2 px-3 border border-zinc-800/80 border-r-4 border-r-zinc-500 text-center font-black bg-indigo-950 text-indigo-400">
                     2025학년도 기준 성적
                   </th>
                 )}
@@ -1230,12 +1500,12 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
                 <th className="py-1 px-1 border border-zinc-800/80 w-36">세부전형</th>
                 <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 leading-tight">모집<br />인원</th>
                 <th className="py-1 px-1 text-center border border-zinc-800/80 w-16 bg-yellow-500/5 text-yellow-400 leading-tight">학생<br />성적</th>
-                <th className="py-1 px-1 text-center border border-zinc-800/80 w-10">액션</th>
+                <th className="py-1 px-1 text-center border border-zinc-800/80 border-r-4 border-r-zinc-500 w-10">액션</th>
 
                 {/* 대비 분석 */}
                 <th className="py-1 px-1 text-center border border-zinc-800/80 w-11 text-emerald-400 font-bold bg-[#1A1D20] tracking-tighter leading-tight">26<br />년도</th>
-                <th className="py-1 px-1 text-center border border-zinc-800/80 w-11 text-amber-400 font-bold bg-[#1A1D20] tracking-tighter leading-tight">25<br />년도</th>
-                <th className="py-1 px-1 text-center border border-zinc-800/80 w-11 text-rose-400 font-bold bg-[#1A1D20] tracking-tighter leading-tight">24<br />년도</th>
+                <th className="py-1 px-1 text-center border border-zinc-800/80 w-11 text-indigo-450 font-bold bg-[#1A1D20] tracking-tighter leading-tight">25<br />년도</th>
+                <th className="py-1 px-1 text-center border border-zinc-800/80 border-r-4 border-r-zinc-500 w-11 text-rose-400 font-bold bg-[#1A1D20] tracking-tighter leading-tight">24<br />년도</th>
 
                 {/* 2025 Year Details */}
                 {show2025 && (
@@ -1250,7 +1520,7 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">70%<br />CUT</th>
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">추합<br />최저</th>
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">추합<br />번호</th>
-                    <th className="py-1 px-1 text-center border border-zinc-800/80 w-16 bg-zinc-950/80 text-zinc-400 leading-tight whitespace-nowrap">경쟁률</th>
+                    <th className="py-1 px-1 text-center border border-zinc-800/80 border-r-4 border-r-zinc-500 w-16 bg-zinc-950/80 text-zinc-400 leading-tight whitespace-nowrap">경쟁률</th>
                   </>
                 )}
 
@@ -1260,14 +1530,14 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">모집<br />인원</th>
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400">최저</th>
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400">최고</th>
-                    <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-amber-950/40 text-amber-300 font-black leading-tight">평균</th>
+                    <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-indigo-900/40 text-indigo-300 font-black leading-tight">평균</th>
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">표준<br />편차</th>
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">추정<br />등수</th>
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-15 bg-zinc-950/80 text-zinc-400 font-bold leading-tight">내신<br />성적<br />위치</th>
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">70%<br />CUT</th>
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">추합<br />최저</th>
                     <th className="py-1 px-1 text-center border border-zinc-800/80 w-14 bg-zinc-950/80 text-zinc-400 leading-tight">추합<br />번호</th>
-                    <th className="py-1 px-1 text-center border border-zinc-800/80 w-16 bg-zinc-950/80 text-zinc-400 leading-tight whitespace-nowrap">경쟁률</th>
+                    <th className="py-1 px-1 text-center border border-zinc-800/80 border-r-4 border-r-zinc-500 w-16 bg-zinc-950/80 text-zinc-400 leading-tight whitespace-nowrap">경쟁률</th>
                   </>
                 )}
 
@@ -1405,7 +1675,7 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
                     </td>
 
                     {/* Single Row actions */}
-                    <td className="py-1 px-1 text-center border border-zinc-800/80">
+                    <td className="py-1 px-1 text-center border border-zinc-800/80 border-r-4 border-r-zinc-500">
                       <button 
                         onClick={() => handleDeleteRow(row.id)}
                         className="p-1 text-zinc-500 hover:text-red-400 transition-colors cursor-pointer"
@@ -1418,7 +1688,7 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
                     {/* Analysis outputs */}
                     <td className={`py-1 px-2 text-center font-extrabold border border-zinc-800/80 text-[10px] ${getAnalysisBadgeColor(row.anal2025)}`}>{row.anal2025}</td>
                     <td className={`py-1 px-2 text-center font-extrabold border border-zinc-800/80 text-[10px] ${getAnalysisBadgeColor(row.anal2024)}`}>{row.anal2024}</td>
-                    <td className={`py-1 px-2 text-center font-extrabold border border-zinc-800/80 text-[10px] ${getAnalysisBadgeColor(row.anal2023)}`}>{row.anal2023}</td>
+                    <td className={`py-1 px-2 text-center font-extrabold border border-zinc-800/80 border-r-4 border-r-zinc-500 text-[10px] ${getAnalysisBadgeColor(row.anal2023)}`}>{row.anal2023}</td>
 
                     {/* 2025 Details */}
                     {show2025 && (
@@ -1432,14 +1702,14 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
                         <td className="py-1 px-1 border border-zinc-800/80 bg-zinc-950/30">
                           <input disabled={isExcluded} type="text" value={row.data2025.maxGpa} onChange={e => handleCellChange(row.id, ['data2025', 'maxGpa'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-zinc-400 font-mono text-[10px]" />
                         </td>
-                        {/* 평균: 핵심 에메랄드 강조색 적용 (추정등수에서 가져옴) */}
+                        {/* 평균: 핵심 에메랄드 강조색 적용 */}
                         <td className="py-1 px-1 border border-zinc-800/80 bg-emerald-950/25">
                           <input disabled={isExcluded} type="text" value={row.data2025.avgGpa} onChange={e => handleCellChange(row.id, ['data2025', 'avgGpa'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none font-bold p-0.5 text-emerald-400 font-mono text-[10px]" />
                         </td>
                         <td className="py-1 px-1 border border-zinc-800/80 bg-zinc-950/30">
                           <input disabled={isExcluded} type="text" value={row.data2025.stdDev} onChange={e => handleCellChange(row.id, ['data2025', 'stdDev'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-zinc-400 font-mono text-[10px]" />
                         </td>
-                        {/* 추정등수: 하이라이트 배경색 제거, 차분한 연회색 */}
+                        {/* 추정등수 */}
                         <td className="py-1 px-1 text-center font-mono font-bold text-zinc-300 bg-zinc-950/30 border border-zinc-800/80 select-none text-[10px]">{row.estRank2025}</td>
                         <td className={`py-1 px-1 text-center font-bold border border-zinc-800/80 select-none text-[10px] ${
                           row.gpaLoc2025 === '상위' ? 'bg-[#064E3B] text-[#D1FAE5]' :
@@ -1455,7 +1725,7 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
                         <td className="py-1 px-1 border border-zinc-800/80 bg-zinc-950/30">
                           <input disabled={isExcluded} type="text" value={row.data2025.chuhapNo} onChange={e => handleCellChange(row.id, ['data2025', 'chuhapNo'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-zinc-400 font-mono text-[10px]" />
                         </td>
-                        <td className="py-1 px-1 border border-zinc-800/80 bg-zinc-950/30">
+                        <td className="py-1 px-1 border border-zinc-800/80 border-r-4 border-r-zinc-500 bg-zinc-950/30">
                           <input disabled={isExcluded} type="text" value={row.data2025.ratio} onChange={e => handleCellChange(row.id, ['data2025', 'ratio'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-zinc-400 font-mono text-[10px]" />
                         </td>
                       </>
@@ -1464,40 +1734,40 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
                     {/* 2024 Details */}
                     {show2024 && (
                       <>
-                        <td className="py-1 px-1 border border-zinc-800/80 bg-zinc-950/30">
-                          <input disabled={isExcluded} type="text" value={row.data2024.recruitCount} onChange={e => handleCellChange(row.id, ['data2024', 'recruitCount'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-zinc-400 font-mono text-[10px]" />
+                        <td className="py-1 px-1 border border-zinc-800/80 bg-indigo-950/15">
+                          <input disabled={isExcluded} type="text" value={row.data2024.recruitCount} onChange={e => handleCellChange(row.id, ['data2024', 'recruitCount'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-indigo-200 font-mono text-[10px]" />
                         </td>
-                        <td className="py-1 px-1 border border-zinc-800/80 bg-zinc-950/30">
-                          <input disabled={isExcluded} type="text" value={row.data2024.minGpa} onChange={e => handleCellChange(row.id, ['data2024', 'minGpa'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-zinc-400 font-mono text-[10px]" />
+                        <td className="py-1 px-1 border border-zinc-800/80 bg-indigo-950/15">
+                          <input disabled={isExcluded} type="text" value={row.data2024.minGpa} onChange={e => handleCellChange(row.id, ['data2024', 'minGpa'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-indigo-200 font-mono text-[10px]" />
                         </td>
-                        <td className="py-1 px-1 border border-zinc-800/80 bg-zinc-950/30">
-                          <input disabled={isExcluded} type="text" value={row.data2024.maxGpa} onChange={e => handleCellChange(row.id, ['data2024', 'maxGpa'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-zinc-400 font-mono text-[10px]" />
+                        <td className="py-1 px-1 border border-zinc-800/80 bg-indigo-950/15">
+                          <input disabled={isExcluded} type="text" value={row.data2024.maxGpa} onChange={e => handleCellChange(row.id, ['data2024', 'maxGpa'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-indigo-200 font-mono text-[10px]" />
                         </td>
-                        {/* 평균: 핵심 앰버/오렌지 강조색 적용 (추정등수에서 가져옴) */}
-                        <td className="py-1 px-1 border border-zinc-800/80 bg-amber-950/30">
-                          <input disabled={isExcluded} type="text" value={row.data2024.avgGpa} onChange={e => handleCellChange(row.id, ['data2024', 'avgGpa'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none font-bold p-0.5 text-amber-400 font-mono text-[10px]" />
+                        {/* 평균: 핵심 인디고/블루 강조색 적용 */}
+                        <td className="py-1 px-1 border border-zinc-800/80 bg-indigo-950/35">
+                          <input disabled={isExcluded} type="text" value={row.data2024.avgGpa} onChange={e => handleCellChange(row.id, ['data2024', 'avgGpa'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none font-bold p-0.5 text-indigo-400 font-mono text-[10px]" />
                         </td>
-                        <td className="py-1 px-1 border border-zinc-800/80 bg-zinc-950/30">
-                          <input disabled={isExcluded} type="text" value={row.data2024.stdDev} onChange={e => handleCellChange(row.id, ['data2024', 'stdDev'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-zinc-400 font-mono text-[10px]" />
+                        <td className="py-1 px-1 border border-zinc-800/80 bg-indigo-950/15">
+                          <input disabled={isExcluded} type="text" value={row.data2024.stdDev} onChange={e => handleCellChange(row.id, ['data2024', 'stdDev'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-indigo-350 font-mono text-[10px]" />
                         </td>
-                        {/* 추정등수: 하이라이트 배경색 제거, 차분한 연회색 */}
-                        <td className="py-1 px-1 text-center font-mono font-bold text-zinc-300 bg-zinc-950/30 border border-zinc-800/80 select-none text-[10px]">{row.estRank2024}</td>
+                        {/* 추정등수 */}
+                        <td className="py-1 px-1 text-center font-mono font-bold text-indigo-350 bg-indigo-950/15 border border-zinc-800/80 select-none text-[10px]">{row.estRank2024}</td>
                         <td className={`py-1 px-1 text-center font-bold border border-zinc-800/80 select-none text-[10px] ${
-                          row.gpaLoc2024 === '상위' ? 'bg-[#064E3B] text-[#D1FAE5]' :
-                          row.gpaLoc2024 === '중위' ? 'bg-[#78350F] text-[#FEF3C7]' :
-                          row.gpaLoc2024 === '하위' ? 'bg-[#7F1D1D] text-[#FECACA]' : 'text-zinc-650'
+                          row.gpaLoc2024 === '상위' ? 'bg-[#1e1b4b] text-[#c7d2fe]' :
+                          row.gpaLoc2024 === '중위' ? 'bg-[#312e81] text-[#a5b4fc]' :
+                          row.gpaLoc2024 === '하위' ? 'bg-zinc-950 text-zinc-500' : 'text-zinc-650'
                         }`}>{row.gpaLoc2024}</td>
-                        <td className="py-1 px-1 border border-zinc-800/80 bg-zinc-950/30">
-                          <input disabled={isExcluded} type="text" value={row.data2024.cut70} onChange={e => handleCellChange(row.id, ['data2024', 'cut70'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-zinc-400 font-mono text-[10px]" />
+                        <td className="py-1 px-1 border border-zinc-800/80 bg-indigo-950/15">
+                          <input disabled={isExcluded} type="text" value={row.data2024.cut70} onChange={e => handleCellChange(row.id, ['data2024', 'cut70'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-indigo-200 font-mono text-[10px]" />
                         </td>
-                        <td className="py-1 px-1 border border-zinc-800/80 bg-zinc-950/30">
-                          <input disabled={isExcluded} type="text" value={row.data2024.chuhapMin} onChange={e => handleCellChange(row.id, ['data2024', 'chuhapMin'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-zinc-400 font-mono text-[10px]" />
+                        <td className="py-1 px-1 border border-zinc-800/80 bg-indigo-950/15">
+                          <input disabled={isExcluded} type="text" value={row.data2024.chuhapMin} onChange={e => handleCellChange(row.id, ['data2024', 'chuhapMin'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-indigo-200 font-mono text-[10px]" />
                         </td>
-                        <td className="py-1 px-1 border border-zinc-800/80 bg-zinc-950/30">
-                          <input disabled={isExcluded} type="text" value={row.data2024.chuhapNo} onChange={e => handleCellChange(row.id, ['data2024', 'chuhapNo'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-zinc-400 font-mono text-[10px]" />
+                        <td className="py-1 px-1 border border-zinc-800/80 bg-indigo-950/15">
+                          <input disabled={isExcluded} type="text" value={row.data2024.chuhapNo} onChange={e => handleCellChange(row.id, ['data2024', 'chuhapNo'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-indigo-200 font-mono text-[10px]" />
                         </td>
-                        <td className="py-1 px-1 border border-zinc-800/80 bg-zinc-950/30">
-                          <input disabled={isExcluded} type="text" value={row.data2024.ratio} onChange={e => handleCellChange(row.id, ['data2024', 'ratio'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-zinc-400 font-mono text-[10px]" />
+                        <td className="py-1 px-1 border border-zinc-800/80 border-r-4 border-r-zinc-500 bg-indigo-950/15">
+                          <input disabled={isExcluded} type="text" value={row.data2024.ratio} onChange={e => handleCellChange(row.id, ['data2024', 'ratio'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-indigo-200 font-mono text-[10px]" />
                         </td>
                       </>
                     )}
@@ -1505,40 +1775,40 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
                     {/* 2023 Details */}
                     {show2023 && (
                       <>
-                        <td className="py-1 px-1 border border-zinc-800/80 bg-zinc-950/30">
-                          <input disabled={isExcluded} type="text" value={row.data2023.recruitCount} onChange={e => handleCellChange(row.id, ['data2023', 'recruitCount'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-zinc-400 font-mono text-[10px]" />
+                        <td className="py-1 px-1 border border-zinc-800/80 bg-rose-950/15">
+                          <input disabled={isExcluded} type="text" value={row.data2023.recruitCount} onChange={e => handleCellChange(row.id, ['data2023', 'recruitCount'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-rose-300 font-mono text-[10px]" />
                         </td>
-                        <td className="py-1 px-1 border border-zinc-800/80 bg-zinc-950/30">
-                          <input disabled={isExcluded} type="text" value={row.data2023.minGpa} onChange={e => handleCellChange(row.id, ['data2023', 'minGpa'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-zinc-400 font-mono text-[10px]" />
+                        <td className="py-1 px-1 border border-zinc-800/80 bg-rose-950/15">
+                          <input disabled={isExcluded} type="text" value={row.data2023.minGpa} onChange={e => handleCellChange(row.id, ['data2023', 'minGpa'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-rose-300 font-mono text-[10px]" />
                         </td>
-                        <td className="py-1 px-1 border border-zinc-800/80 bg-zinc-950/30">
-                          <input disabled={isExcluded} type="text" value={row.data2023.maxGpa} onChange={e => handleCellChange(row.id, ['data2023', 'maxGpa'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-zinc-400 font-mono text-[10px]" />
+                        <td className="py-1 px-1 border border-zinc-800/80 bg-rose-950/15">
+                          <input disabled={isExcluded} type="text" value={row.data2023.maxGpa} onChange={e => handleCellChange(row.id, ['data2023', 'maxGpa'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-rose-300 font-mono text-[10px]" />
                         </td>
-                        {/* 평균: 핵심 장미/로즈 강조색 적용 (추정등수에서 가져옴) */}
+                        {/* 평균: 핵심 장미/로즈 강조색 적용 */}
                         <td className="py-1 px-1 border border-zinc-800/80 bg-rose-950/30">
                           <input disabled={isExcluded} type="text" value={row.data2023.avgGpa} onChange={e => handleCellChange(row.id, ['data2023', 'avgGpa'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none font-bold p-0.5 text-rose-350 font-mono text-[10px]" />
                         </td>
-                        <td className="py-1 px-1 border border-zinc-800/80 bg-zinc-950/30">
-                          <input disabled={isExcluded} type="text" value={row.data2023.stdDev} onChange={e => handleCellChange(row.id, ['data2023', 'stdDev'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-zinc-400 font-mono text-[10px]" />
+                        <td className="py-1 px-1 border border-zinc-800/80 bg-rose-950/15">
+                          <input disabled={isExcluded} type="text" value={row.data2023.stdDev} onChange={e => handleCellChange(row.id, ['data2023', 'stdDev'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-rose-350 font-mono text-[10px]" />
                         </td>
-                        {/* 추정등수: 하이라이트 배경색 제거, 차분한 연회색 */}
-                        <td className="py-1 px-1 text-center font-mono font-bold text-zinc-300 bg-zinc-950/30 border border-zinc-800/80 select-none text-[10px]">{row.estRank2023}</td>
+                        {/* 추정등수 */}
+                        <td className="py-1 px-1 text-center font-mono font-bold text-rose-350 bg-rose-950/15 border border-zinc-800/80 select-none text-[10px]">{row.estRank2023}</td>
                         <td className={`py-1 px-1 text-center font-bold border border-zinc-800/80 select-none text-[10px] ${
-                          row.gpaLoc2023 === '상위' ? 'bg-[#064E3B] text-[#D1FAE5]' :
-                          row.gpaLoc2023 === '중위' ? 'bg-[#78350F] text-[#FEF3C7]' :
-                          row.gpaLoc2023 === '하위' ? 'bg-[#7F1D1D] text-[#FECACA]' : 'text-zinc-650'
+                          row.gpaLoc2023 === '상위' ? 'bg-[#881337] text-[#fecdd3]' :
+                          row.gpaLoc2023 === '중위' ? 'bg-[#4c0519] text-[#fda4af]' :
+                          row.gpaLoc2023 === '하위' ? 'bg-zinc-950 text-zinc-500' : 'text-zinc-650'
                         }`}>{row.gpaLoc2023}</td>
-                        <td className="py-1 px-1 border border-zinc-800/80 bg-zinc-950/30">
-                          <input disabled={isExcluded} type="text" value={row.data2023.cut70} onChange={e => handleCellChange(row.id, ['data2023', 'cut70'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-zinc-400 font-mono text-[10px]" />
+                        <td className="py-1 px-1 border border-zinc-800/80 bg-rose-950/15">
+                          <input disabled={isExcluded} type="text" value={row.data2023.cut70} onChange={e => handleCellChange(row.id, ['data2023', 'cut70'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-rose-300 font-mono text-[10px]" />
                         </td>
-                        <td className="py-1 px-1 border border-zinc-800/80 bg-zinc-950/30">
-                          <input disabled={isExcluded} type="text" value={row.data2023.chuhapMin} onChange={e => handleCellChange(row.id, ['data2023', 'chuhapMin'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-zinc-400 font-mono text-[10px]" />
+                        <td className="py-1 px-1 border border-zinc-800/80 bg-rose-950/15">
+                          <input disabled={isExcluded} type="text" value={row.data2023.chuhapMin} onChange={e => handleCellChange(row.id, ['data2023', 'chuhapMin'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-rose-300 font-mono text-[10px]" />
                         </td>
-                        <td className="py-1 px-1 border border-zinc-800/80 bg-zinc-950/30">
-                          <input disabled={isExcluded} type="text" value={row.data2023.chuhapNo} onChange={e => handleCellChange(row.id, ['data2023', 'chuhapNo'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-zinc-400 font-mono text-[10px]" />
+                        <td className="py-1 px-1 border border-zinc-800/80 bg-rose-950/15">
+                          <input disabled={isExcluded} type="text" value={row.data2023.chuhapNo} onChange={e => handleCellChange(row.id, ['data2023', 'chuhapNo'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-rose-300 font-mono text-[10px]" />
                         </td>
-                        <td className="py-1 px-1 border border-zinc-800/80 bg-zinc-950/30">
-                          <input disabled={isExcluded} type="text" value={row.data2023.ratio} onChange={e => handleCellChange(row.id, ['data2023', 'ratio'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-zinc-400 font-mono text-[10px]" />
+                        <td className="py-1 px-1 border border-zinc-800/80 bg-rose-950/15">
+                          <input disabled={isExcluded} type="text" value={row.data2023.ratio} onChange={e => handleCellChange(row.id, ['data2023', 'ratio'], e.target.value)} className="w-full bg-transparent border-0 text-center focus:outline-none p-0.5 text-rose-300 font-mono text-[10px]" />
                         </td>
                       </>
                     )}
