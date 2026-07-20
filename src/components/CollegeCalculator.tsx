@@ -33,6 +33,7 @@ interface YearlyData {
   chuhapMin: string;
   chuhapNo: string;
   ratio: string;
+  finalAvgGpa?: string;
 }
 
 interface SimRow {
@@ -51,8 +52,8 @@ interface SimRow {
 }
 
 // Compact helper to generate year statistics
-function yData(rc: string, min: string, max: string, avg: string, sd: string, cut50: string, cut: string, chMin: string, chNo: string, rat: string): YearlyData {
-  return { recruitCount: rc, minGpa: min, maxGpa: max, avgGpa: avg, stdDev: sd, cut50, cut70: cut, chuhapMin: chMin, chuhapNo: chNo, ratio: rat };
+function yData(rc: string, min: string, max: string, avg: string, sd: string, cut50: string, cut: string, chMin: string, chNo: string, rat: string, finalAvgGpa: string = ''): YearlyData {
+  return { recruitCount: rc, minGpa: min, maxGpa: max, avgGpa: avg, stdDev: sd, cut50, cut70: cut, chuhapMin: chMin, chuhapNo: chNo, ratio: rat, finalAvgGpa };
 }
 
 // Helper function to create default blank rows
@@ -349,37 +350,40 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
             match.recruitCount2026 || '',
             match.minGpa2026 || '',
             match.maxGpa2026 || '',
-            match.avgGpa2026 || '',
+            '', // Keep empty for manual first-pass input
             match.stdDev2026 || '',
             match.cut50_2026 || '',
             match.cut70_2026 || '',
             match.chuhapMin2026 || '',
             match.chuhapNo2026 || '',
-            match.ratio2026 || ''
+            match.ratio2026 || '',
+            match.avgGpa2026 || '' // finalAvgGpa queried from DB
           );
           copy.data2024 = yData(
             match.recruitCount2025 || '',
             match.minGpa2025 || '',
             match.maxGpa2025 || '',
-            match.avgGpa2025 || '',
+            '', // Keep empty for manual first-pass input
             match.stdDev2025 || '',
             match.cut50_2025 || '',
             match.cut70_2025 || '',
             match.chuhapMin2025 || '',
             match.chuhapNo2025 || '',
-            match.ratio2025 || ''
+            match.ratio2025 || '',
+            match.avgGpa2025 || '' // finalAvgGpa queried from DB
           );
           copy.data2023 = yData(
             match.recruitCount2024 || '',
             match.minGpa2024 || '',
             match.maxGpa2024 || '',
-            match.avgGpa2024 || '',
+            '', // Keep empty for manual first-pass input
             match.stdDev2024 || '',
             match.cut50_2024 || '',
             match.cut70_2024 || '',
             match.chuhapMin2024 || '',
             match.chuhapNo2024 || '',
-            match.ratio2024 || ''
+            match.ratio2024 || '',
+            match.avgGpa2024 || '' // finalAvgGpa queried from DB
           );
         }
       }
@@ -985,9 +989,13 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
                   const targetRow = processedRows.find(r => r.id === activeOverlayData.rowId);
                   if (!targetRow) return <div className="text-slate-500 font-bold p-4">데이터를 찾을 수 없습니다.</div>;
 
-                  const pos24 = calculateMyPosition(targetRow.type, targetRow.studentGpa, targetRow.data2023.maxGpa, targetRow.data2023.avgGpa, targetRow.data2023.cut70, targetRow.data2023.minGpa);
-                  const pos25 = calculateMyPosition(targetRow.type, targetRow.studentGpa, targetRow.data2024.maxGpa, targetRow.data2024.avgGpa, targetRow.data2024.cut70, targetRow.data2024.minGpa);
-                  const pos26 = calculateMyPosition(targetRow.type, targetRow.studentGpa, targetRow.data2025.maxGpa, targetRow.data2025.avgGpa, targetRow.data2025.cut70, targetRow.data2025.minGpa);
+                  const finalAvg24 = targetRow.data2023.finalAvgGpa !== undefined ? targetRow.data2023.finalAvgGpa : (activeOverlayData.stats2024?.average || '');
+                  const finalAvg25 = targetRow.data2024.finalAvgGpa !== undefined ? targetRow.data2024.finalAvgGpa : (activeOverlayData.stats2025?.average || '');
+                  const finalAvg26 = targetRow.data2025.finalAvgGpa !== undefined ? targetRow.data2025.finalAvgGpa : (activeOverlayData.stats2026?.average || '');
+
+                  const pos24 = calculateMyPosition(targetRow.type, targetRow.studentGpa, targetRow.data2023.maxGpa, finalAvg24, targetRow.data2023.cut70, targetRow.data2023.minGpa);
+                  const pos25 = calculateMyPosition(targetRow.type, targetRow.studentGpa, targetRow.data2024.maxGpa, finalAvg25, targetRow.data2024.cut70, targetRow.data2024.minGpa);
+                  const pos26 = calculateMyPosition(targetRow.type, targetRow.studentGpa, targetRow.data2025.maxGpa, finalAvg26, targetRow.data2025.cut70, targetRow.data2025.minGpa);
 
                   return (
                     <div>
@@ -1150,34 +1158,39 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
                             </tr>
                             {/* 4. 평균 */}
                             <tr>
-                              <td className="py-1 px-1 bg-slate-50 font-bold border-r border-slate-200 text-slate-700">평균</td>
+                              <td className="py-1 px-1 bg-slate-50 font-extrabold border-r border-slate-200 text-slate-700 select-none leading-tight text-[10px] md:text-[11px]">
+                                평균<br />(최종등록자 기준)
+                              </td>
                               <td className="py-0.5 px-1 border-r border-slate-200">
                                 <input
                                   type="text"
-                                  value={targetRow.data2023.avgGpa}
-                                  onChange={(e) => handleModalValueChange('2023', 'avgGpa', e.target.value)}
+                                  value={targetRow.data2023.finalAvgGpa !== undefined ? targetRow.data2023.finalAvgGpa : (activeOverlayData.stats2024?.average || '')}
+                                  onChange={(e) => handleModalValueChange('2023', 'finalAvgGpa', e.target.value)}
                                   className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
                                 />
                               </td>
                               <td className="py-0.5 px-1 border-r border-slate-200">
                                 <input
                                   type="text"
-                                  value={targetRow.data2024.avgGpa}
-                                  onChange={(e) => handleModalValueChange('2024', 'avgGpa', e.target.value)}
+                                  value={targetRow.data2024.finalAvgGpa !== undefined ? targetRow.data2024.finalAvgGpa : (activeOverlayData.stats2025?.average || '')}
+                                  onChange={(e) => handleModalValueChange('2024', 'finalAvgGpa', e.target.value)}
                                   className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
                                 />
                               </td>
                               <td className="py-0.5 px-1 border-r border-slate-200">
                                 <input
                                   type="text"
-                                  value={targetRow.data2025.avgGpa}
-                                  onChange={(e) => handleModalValueChange('2025', 'avgGpa', e.target.value)}
+                                  value={targetRow.data2025.finalAvgGpa !== undefined ? targetRow.data2025.finalAvgGpa : (activeOverlayData.stats2026?.average || '')}
+                                  onChange={(e) => handleModalValueChange('2025', 'finalAvgGpa', e.target.value)}
                                   className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
                                 />
                               </td>
                               <td className="py-1 px-1 font-bold text-[10px] md:text-[11px]">
                                 {(() => {
-                                  const trend = getTrend(targetRow.data2023.avgGpa, targetRow.data2024.avgGpa, targetRow.data2025.avgGpa, 'score');
+                                  const v24 = targetRow.data2023.finalAvgGpa !== undefined ? targetRow.data2023.finalAvgGpa : (activeOverlayData.stats2024?.average || '');
+                                  const v25 = targetRow.data2024.finalAvgGpa !== undefined ? targetRow.data2024.finalAvgGpa : (activeOverlayData.stats2025?.average || '');
+                                  const v26 = targetRow.data2025.finalAvgGpa !== undefined ? targetRow.data2025.finalAvgGpa : (activeOverlayData.stats2026?.average || '');
+                                  const trend = getTrend(v24, v25, v26, 'score');
                                   return trend.text ? <span className={trend.className}>{trend.text}</span> : <span className="text-slate-400">-</span>;
                                 })()}
                               </td>
