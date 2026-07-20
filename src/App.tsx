@@ -202,7 +202,7 @@ export default function App() {
                 {currentTab === 'mock' && (
                   <MockGradeViewer student={currentStudent} students={students} primaryColor={primaryColor} />
                 )}
-                {currentTab === 'mock-rank' && (
+                {currentTab === 'mock-rank' && session.role !== 'student' && (
                   <MockRankViewer students={students} primaryColor={primaryColor} />
                 )}
                 {currentTab === 'admin' && (

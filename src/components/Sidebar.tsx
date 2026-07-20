@@ -44,7 +44,7 @@ export default function Sidebar({
     { id: 'college', name: '2027학년도 희망대학 산출', icon: Compass, roles: ['student', 'teacher', 'admin'] },
     { id: 'gpa', name: '내신성적 조회', icon: BookOpen, roles: ['student', 'teacher', 'admin'] },
     { id: 'mock', name: '모의고사 성적 조회', icon: Activity, roles: ['student', 'teacher', 'admin'] },
-    { id: 'mock-rank', name: '모의고사 과목별 석차 조회', icon: Award, roles: ['student', 'teacher', 'admin'] },
+    { id: 'mock-rank', name: '모의고사 과목별 석차 조회', icon: Award, roles: ['teacher', 'admin'] },
     { id: 'admin', name: '관리자 설정', icon: Settings, roles: ['teacher', 'admin'] } // 학생에겐 비노출
   ];
 
