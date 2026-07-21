@@ -604,18 +604,22 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
   // Rule 5 + 7 + 10 + 11: Real-time values generator helper
   const processedRows = useMemo(() => {
     return currentSheet.map((row, idx) => {
-      const gpaLoc2025 = calculateGpaLocation(row.studentGpa, row.data2025.avgGpa, row.data2025.stdDev);
-      const estRank2025 = calculateEstimatedRank(row.studentGpa, row.data2025.avgGpa, row.data2025.stdDev, row.data2025.recruitCount);
+      const avg2025 = row.data2025.avgGpa || row.data2025.finalAvgGpa || '';
+      const avg2024 = row.data2024.avgGpa || row.data2024.finalAvgGpa || '';
+      const avg2023 = row.data2023.avgGpa || row.data2023.finalAvgGpa || '';
+
+      const gpaLoc2025 = calculateGpaLocation(row.studentGpa, avg2025, row.data2025.stdDev);
+      const estRank2025 = calculateEstimatedRank(row.studentGpa, avg2025, row.data2025.stdDev, row.data2025.recruitCount);
       
-      const gpaLoc2024 = calculateGpaLocation(row.studentGpa, row.data2024.avgGpa, row.data2024.stdDev);
-      const estRank2024 = calculateEstimatedRank(row.studentGpa, row.data2024.avgGpa, row.data2024.stdDev, row.data2024.recruitCount);
+      const gpaLoc2024 = calculateGpaLocation(row.studentGpa, avg2024, row.data2024.stdDev);
+      const estRank2024 = calculateEstimatedRank(row.studentGpa, avg2024, row.data2024.stdDev, row.data2024.recruitCount);
 
-      const gpaLoc2023 = calculateGpaLocation(row.studentGpa, row.data2023.avgGpa, row.data2023.stdDev);
-      const estRank2023 = calculateEstimatedRank(row.studentGpa, row.data2023.avgGpa, row.data2023.stdDev, row.data2023.recruitCount);
+      const gpaLoc2023 = calculateGpaLocation(row.studentGpa, avg2023, row.data2023.stdDev);
+      const estRank2023 = calculateEstimatedRank(row.studentGpa, avg2023, row.data2023.stdDev, row.data2023.recruitCount);
 
-      const anal2025 = calculateAnalysis(row.type, row.studentGpa, row.data2025.maxGpa, row.data2025.avgGpa, row.data2025.minGpa, row.data2025.cut70, row.data2025.chuhapMin);
-      const anal2024 = calculateAnalysis(row.type, row.studentGpa, row.data2024.maxGpa, row.data2024.avgGpa, row.data2024.minGpa, row.data2024.cut70, row.data2024.chuhapMin);
-      const anal2023 = calculateAnalysis(row.type, row.studentGpa, row.data2023.maxGpa, row.data2023.avgGpa, row.data2023.minGpa, row.data2023.cut70, row.data2023.chuhapMin);
+      const anal2025 = calculateAnalysis(row.type, row.studentGpa, row.data2025.maxGpa, avg2025, row.data2025.minGpa, row.data2025.cut70, row.data2025.chuhapMin);
+      const anal2024 = calculateAnalysis(row.type, row.studentGpa, row.data2024.maxGpa, avg2024, row.data2024.minGpa, row.data2024.cut70, row.data2024.chuhapMin);
+      const anal2023 = calculateAnalysis(row.type, row.studentGpa, row.data2023.maxGpa, avg2023, row.data2023.minGpa, row.data2023.cut70, row.data2023.chuhapMin);
 
       return {
         ...row,

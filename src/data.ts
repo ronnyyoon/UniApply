@@ -936,7 +936,7 @@ export function buildStudentsFromRaw(): Student[] {
 
     // 학생 내신과 대학 컷 비례하여 합격 가능성 성향 배치
     filteredColleges.forEach((col, cIdx) => {
-      const difference = gpa - col.cutLine;
+      const difference = col.cutLine - gpa;
       let suitability: '안정' | '적정' | '소신' | '우려' | '불가' = '적정';
       
       if (difference < -0.8) suitability = '불가';
