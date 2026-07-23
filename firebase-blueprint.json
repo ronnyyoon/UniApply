@@ -23,12 +23,28 @@
         "ratio2024": { "type": "string", "description": "Competition ratio in 2024" }
       },
       "required": ["college", "major", "type", "detailType"]
+    },
+    "StudentSheet": {
+      "title": "Student Target College Calculation Sheet",
+      "description": "Shared calculation spreadsheet rows for a student's target universities",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string", "description": "Student ID" },
+        "rows": { "type": "array", "description": "List of target college calculation rows" },
+        "updatedAt": { "type": "string", "description": "Last update timestamp" },
+        "updatedBy": { "type": "string", "description": "Name of last modifier (student or teacher)" }
+      },
+      "required": ["studentId", "rows"]
     }
   },
   "firestore": {
     "college_stats": {
       "schema": "CollegeStat",
       "description": "Collection of university admission statistics across multiple years"
+    },
+    "student_sheets": {
+      "schema": "StudentSheet",
+      "description": "Shared calculation sheets for student target universities, accessible by both students and teachers"
     }
   }
 }

@@ -1,11 +1,95 @@
 // src 바로 밑에 저장한 68만 줄짜리 로컬 입결 JSON 파일 로드
 import universityData from '../university_stats.json';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getFirestore, doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
+import firebaseConfig from '../../firebase-applet-config.json';
 
-// 외부 원격 파이어베이스 서버 연동 완전 해제를 위한 더미 선언 (빌드 에러 방지)
-const importedConfig: any = {};
-export default importedConfig;
-export const db: any = {};
-export const dbEnv: any = {};
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export default app;
+
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+  };
+}
+
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: null,
+      email: null,
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+}
+
+export interface StudentSheetDoc {
+  studentId: string;
+  rows: any[];
+  updatedAt: string;
+  updatedBy?: string;
+}
+
+// 학생별 희망대학 산출 내역 Firestore 실시간 구독
+export function subscribeStudentSheet(
+  studentId: string, 
+  onUpdate: (data: { rows: any[]; updatedAt?: string; updatedBy?: string }) => void
+): () => void {
+  if (!studentId || !db) return () => {};
+  const docPath = `student_sheets/${studentId}`;
+  const docRef = doc(db, 'student_sheets', studentId);
+
+  const unsubscribe = onSnapshot(docRef, (docSnap) => {
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      if (data && Array.isArray(data.rows)) {
+        onUpdate({
+          rows: data.rows,
+          updatedAt: data.updatedAt,
+          updatedBy: data.updatedBy
+        });
+      }
+    }
+  }, (err) => {
+    handleFirestoreError(err, OperationType.GET, docPath);
+  });
+
+  return unsubscribe;
+}
+
+// 학생별 희망대학 산출 내역 Firestore 저장
+export async function saveStudentSheet(studentId: string, rows: any[], updatedBy?: string): Promise<void> {
+  if (!studentId || !db) return;
+  const docPath = `student_sheets/${studentId}`;
+  try {
+    const docRef = doc(db, 'student_sheets', studentId);
+    await setDoc(docRef, {
+      studentId,
+      rows,
+      updatedAt: new Date().toISOString(),
+      updatedBy: updatedBy || '사용자'
+    }, { merge: true });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, docPath);
+  }
+}
 
 export interface CollegeStat {
   id: string;

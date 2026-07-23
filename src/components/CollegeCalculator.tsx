@@ -16,10 +16,11 @@ import {
   EyeOff,
   Database,
   WifiOff,
-  Info
+  Info,
+  Users
 } from 'lucide-react';
-import { Student } from '../types';
-import { fetchCollegeStats, CollegeStat, seedCollegeStats } from '../lib/firebase';
+import { Student, UserSession } from '../types';
+import { fetchCollegeStats, CollegeStat, seedCollegeStats, subscribeStudentSheet, saveStudentSheet } from '../lib/firebase';
 import universityData from '../university_stats.json';
 
 interface YearlyData {
@@ -228,9 +229,10 @@ const ADMISSION_TYPES = [
 interface CollegeCalculatorProps {
   student: Student;
   primaryColor: string;
+  session?: UserSession | null;
 }
 
-export default function CollegeCalculator({ student, primaryColor }: CollegeCalculatorProps) {
+export default function CollegeCalculator({ student, primaryColor, session }: CollegeCalculatorProps) {
   // Store spreadsheets in React State mapped by student id
   const [studentSpreadsheets, setStudentSpreadsheets] = useState<Record<string, SimRow[]>>(() => {
     const saved = localStorage.getItem('ADMIT2027_COLLEGE_SHEETS_V2');
@@ -244,9 +246,37 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
     return {};
   });
 
+  // Real-time sync metadata state
+  const [lastSyncInfo, setLastSyncInfo] = useState<{ updatedAt?: string; updatedBy?: string } | null>(null);
+
   useEffect(() => {
     localStorage.setItem('ADMIT2027_COLLEGE_SHEETS_V2', JSON.stringify(studentSpreadsheets));
   }, [studentSpreadsheets]);
+
+  // Firestore real-time listener for shared student calculation sheet (학생-교사 공동 영역 연동)
+  useEffect(() => {
+    if (!student || !student.id) return;
+
+    const unsubscribe = subscribeStudentSheet(student.id, ({ rows, updatedAt, updatedBy }) => {
+      setStudentSpreadsheets(prev => {
+        const existing = prev[student.id];
+        if (JSON.stringify(existing) === JSON.stringify(rows)) {
+          return prev;
+        }
+        return {
+          ...prev,
+          [student.id]: rows
+        };
+      });
+      if (updatedAt || updatedBy) {
+        setLastSyncInfo({ updatedAt, updatedBy });
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [student.id]);
 
   // Firestore stats state
   const [dbStats, setDbStats] = useState<CollegeStat[]>([]);
@@ -526,12 +556,21 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
     return studentSpreadsheets[student.id];
   }, [studentSpreadsheets, student.id, student.gpa]);
 
-  // Update master state helper
+  // Update master state helper and sync to shared Firestore database
   const updateCurrentSheet = (newSheet: SimRow[]) => {
-    setStudentSpreadsheets(prev => ({
-      ...prev,
-      [student.id]: newSheet
-    }));
+    setStudentSpreadsheets(prev => {
+      const updatedMap = {
+        ...prev,
+        [student.id]: newSheet
+      };
+      localStorage.setItem('ADMIT2027_COLLEGE_SHEETS_V2', JSON.stringify(updatedMap));
+      return updatedMap;
+    });
+
+    const updaterName = session ? `${session.name} (${session.role === 'teacher' ? '교사' : session.role === 'student' ? '학생' : '관리자'})` : '사용자';
+    saveStudentSheet(student.id, newSheet, updaterName).catch(err => {
+      console.error('Firestore 공동 영역 저장 실패:', err);
+    });
   };
 
   const handleModalValueChange = (year: '2023' | '2024' | '2025', field: keyof YearlyData, value: string) => {
@@ -780,6 +819,23 @@ export default function CollegeCalculator({ student, primaryColor }: CollegeCalc
             한국대학교육협의회 전국수시 배치 지침과 동일하게 구성한 통합 시뮬레이터입니다. 각 년도별 최저, 최고, 평균, 표준편차 값을 직접 갱신하여 고등학교 교량 환산 등수와 내신 위치 판정을 즉석에서 연쇄 연산할 수 있습니다.
           </p>
           <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
+            <div className="flex items-center gap-2 bg-sky-950/40 border border-sky-500/30 px-3 py-1.5 rounded-lg">
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
+              </span>
+              <span className="text-[10px] font-bold text-sky-400 font-sans flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 shrink-0 text-sky-400" />
+                학생·교사 실시간 공동 공유 영역 작동 중
+                {lastSyncInfo?.updatedBy && (
+                  <span className="text-zinc-400 font-normal">
+                    (최종 작성: <strong className="text-sky-300 font-bold">{lastSyncInfo.updatedBy}</strong>
+                    {lastSyncInfo.updatedAt && ` - ${new Date(lastSyncInfo.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`})
+                  </span>
+                )}
+              </span>
+            </div>
+
             {statsSource === 'firestore' && (
               <div className="flex items-center gap-2 bg-emerald-950/25 border border-emerald-500/30 px-3 py-1.5 rounded-lg">
                 <span className="flex h-2 w-2 relative">

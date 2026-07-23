@@ -194,7 +194,7 @@ export default function App() {
               {/* 좌측 메인 탭 활성화 화면 */}
               <main className="flex-1 overflow-hidden min-h-0">
                 {currentTab === 'college' && (
-                  <CollegeCalculator student={currentStudent} primaryColor={primaryColor} />
+                  <CollegeCalculator student={currentStudent} session={session} primaryColor={primaryColor} />
                 )}
                 {currentTab === 'gpa' && (
                   <GradeViewer student={currentStudent} primaryColor={primaryColor} />
