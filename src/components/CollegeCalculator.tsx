@@ -35,6 +35,8 @@ interface YearlyData {
   chuhapNo: string;
   ratio: string;
   finalAvgGpa?: string;
+  finalMaxGpa?: string;
+  finalMinGpa?: string;
 }
 
 interface SimRow {
@@ -53,8 +55,36 @@ interface SimRow {
 }
 
 // Compact helper to generate year statistics
-function yData(rc: string, min: string, max: string, avg: string, sd: string, cut50: string, cut: string, chMin: string, chNo: string, rat: string, finalAvgGpa: string = ''): YearlyData {
-  return { recruitCount: rc, minGpa: min, maxGpa: max, avgGpa: avg, stdDev: sd, cut50, cut70: cut, chuhapMin: chMin, chuhapNo: chNo, ratio: rat, finalAvgGpa };
+function yData(
+  rc: string, 
+  min: string, 
+  max: string, 
+  avg: string, 
+  sd: string, 
+  cut50: string, 
+  cut: string, 
+  chMin: string, 
+  chNo: string, 
+  rat: string, 
+  finalAvgGpa: string = '',
+  finalMaxGpa: string = '',
+  finalMinGpa: string = ''
+): YearlyData {
+  return { 
+    recruitCount: rc, 
+    minGpa: min, 
+    maxGpa: max, 
+    avgGpa: avg, 
+    stdDev: sd, 
+    cut50, 
+    cut70: cut, 
+    chuhapMin: chMin, 
+    chuhapNo: chNo, 
+    ratio: rat, 
+    finalAvgGpa,
+    finalMaxGpa,
+    finalMinGpa
+  };
 }
 
 // Helper function to create default blank rows
@@ -387,7 +417,9 @@ export default function CollegeCalculator({ student, primaryColor, session }: Co
             match.chuhapMin2026 || '',
             match.chuhapNo2026 || '',
             match.ratio2026 || '',
-            match.avgGpa2026 || '' // finalAvgGpa queried from DB
+            match.avgGpa2026 || '', // finalAvgGpa queried from DB
+            match.maxGpa2026 || '', // finalMaxGpa queried from DB
+            match.minGpa2026 || ''  // finalMinGpa queried from DB
           );
           copy.data2024 = yData(
             match.recruitCount2025 || '',
@@ -400,7 +432,9 @@ export default function CollegeCalculator({ student, primaryColor, session }: Co
             match.chuhapMin2025 || '',
             match.chuhapNo2025 || '',
             match.ratio2025 || '',
-            match.avgGpa2025 || '' // finalAvgGpa queried from DB
+            match.avgGpa2025 || '', // finalAvgGpa queried from DB
+            match.maxGpa2025 || '', // finalMaxGpa queried from DB
+            match.minGpa2025 || ''  // finalMinGpa queried from DB
           );
           copy.data2023 = yData(
             match.recruitCount2024 || '',
@@ -413,7 +447,9 @@ export default function CollegeCalculator({ student, primaryColor, session }: Co
             match.chuhapMin2024 || '',
             match.chuhapNo2024 || '',
             match.ratio2024 || '',
-            match.avgGpa2024 || '' // finalAvgGpa queried from DB
+            match.avgGpa2024 || '', // finalAvgGpa queried from DB
+            match.maxGpa2024 || '', // finalMaxGpa queried from DB
+            match.minGpa2024 || ''  // finalMinGpa queried from DB
           );
         }
       }
@@ -1188,30 +1224,33 @@ export default function CollegeCalculator({ student, primaryColor, session }: Co
                               <td className="py-0.5 px-1 border-r border-slate-200">
                                 <input
                                   type="text"
-                                  value={targetRow.data2023.maxGpa}
-                                  onChange={(e) => handleModalValueChange('2023', 'maxGpa', e.target.value)}
+                                  value={targetRow.data2023.finalMaxGpa !== undefined ? targetRow.data2023.finalMaxGpa : (activeOverlayData.stats2024?.highest || '')}
+                                  onChange={(e) => handleModalValueChange('2023', 'finalMaxGpa', e.target.value)}
                                   className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
                                 />
                               </td>
                               <td className="py-0.5 px-1 border-r border-slate-200">
                                 <input
                                   type="text"
-                                  value={targetRow.data2024.maxGpa}
-                                  onChange={(e) => handleModalValueChange('2024', 'maxGpa', e.target.value)}
+                                  value={targetRow.data2024.finalMaxGpa !== undefined ? targetRow.data2024.finalMaxGpa : (activeOverlayData.stats2025?.highest || '')}
+                                  onChange={(e) => handleModalValueChange('2024', 'finalMaxGpa', e.target.value)}
                                   className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
                                 />
                               </td>
                               <td className="py-0.5 px-1 border-r border-slate-200">
                                 <input
                                   type="text"
-                                  value={targetRow.data2025.maxGpa}
-                                  onChange={(e) => handleModalValueChange('2025', 'maxGpa', e.target.value)}
+                                  value={targetRow.data2025.finalMaxGpa !== undefined ? targetRow.data2025.finalMaxGpa : (activeOverlayData.stats2026?.highest || '')}
+                                  onChange={(e) => handleModalValueChange('2025', 'finalMaxGpa', e.target.value)}
                                   className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
                                 />
                               </td>
                               <td className="py-1 px-1 font-bold text-[10px] md:text-[11px]">
                                 {(() => {
-                                  const trend = getTrend(targetRow.data2023.maxGpa, targetRow.data2024.maxGpa, targetRow.data2025.maxGpa, 'score');
+                                  const v24 = targetRow.data2023.finalMaxGpa !== undefined ? targetRow.data2023.finalMaxGpa : (activeOverlayData.stats2024?.highest || '');
+                                  const v25 = targetRow.data2024.finalMaxGpa !== undefined ? targetRow.data2024.finalMaxGpa : (activeOverlayData.stats2025?.highest || '');
+                                  const v26 = targetRow.data2025.finalMaxGpa !== undefined ? targetRow.data2025.finalMaxGpa : (activeOverlayData.stats2026?.highest || '');
+                                  const trend = getTrend(v24, v25, v26, 'score');
                                   return trend.text ? <span className={trend.className}>{trend.text}</span> : <span className="text-slate-400">-</span>;
                                 })()}
                               </td>
@@ -1295,30 +1334,33 @@ export default function CollegeCalculator({ student, primaryColor, session }: Co
                               <td className="py-0.5 px-1 border-r border-slate-200">
                                 <input
                                   type="text"
-                                  value={targetRow.data2023.minGpa}
-                                  onChange={(e) => handleModalValueChange('2023', 'minGpa', e.target.value)}
+                                  value={targetRow.data2023.finalMinGpa !== undefined ? targetRow.data2023.finalMinGpa : (activeOverlayData.stats2024?.lowest || '')}
+                                  onChange={(e) => handleModalValueChange('2023', 'finalMinGpa', e.target.value)}
                                   className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
                                 />
                               </td>
                               <td className="py-0.5 px-1 border-r border-slate-200">
                                 <input
                                   type="text"
-                                  value={targetRow.data2024.minGpa}
-                                  onChange={(e) => handleModalValueChange('2024', 'minGpa', e.target.value)}
+                                  value={targetRow.data2024.finalMinGpa !== undefined ? targetRow.data2024.finalMinGpa : (activeOverlayData.stats2025?.lowest || '')}
+                                  onChange={(e) => handleModalValueChange('2024', 'finalMinGpa', e.target.value)}
                                   className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
                                 />
                               </td>
                               <td className="py-0.5 px-1 border-r border-slate-200">
                                 <input
                                   type="text"
-                                  value={targetRow.data2025.minGpa}
-                                  onChange={(e) => handleModalValueChange('2025', 'minGpa', e.target.value)}
+                                  value={targetRow.data2025.finalMinGpa !== undefined ? targetRow.data2025.finalMinGpa : (activeOverlayData.stats2026?.lowest || '')}
+                                  onChange={(e) => handleModalValueChange('2025', 'finalMinGpa', e.target.value)}
                                   className="w-full h-6 bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white text-center rounded font-mono font-bold text-slate-900 focus:outline-none transition-all text-[11px] py-0"
                                 />
                               </td>
                               <td className="py-1 px-1 font-bold text-[10px] md:text-[11px]">
                                 {(() => {
-                                  const trend = getTrend(targetRow.data2023.minGpa, targetRow.data2024.minGpa, targetRow.data2025.minGpa, 'score');
+                                  const v24 = targetRow.data2023.finalMinGpa !== undefined ? targetRow.data2023.finalMinGpa : (activeOverlayData.stats2024?.lowest || '');
+                                  const v25 = targetRow.data2024.finalMinGpa !== undefined ? targetRow.data2024.finalMinGpa : (activeOverlayData.stats2025?.lowest || '');
+                                  const v26 = targetRow.data2025.finalMinGpa !== undefined ? targetRow.data2025.finalMinGpa : (activeOverlayData.stats2026?.lowest || '');
+                                  const trend = getTrend(v24, v25, v26, 'score');
                                   return trend.text ? <span className={trend.className}>{trend.text}</span> : <span className="text-slate-400">-</span>;
                                 })()}
                               </td>
